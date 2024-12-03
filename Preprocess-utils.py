@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-import numpy
+import numpy as np
 
 file_path = "/home/kevin/Downloads/Datasets/DiagProgAnalysis"
 file_name = "simple-dataset.csv"
@@ -23,6 +23,25 @@ def rename_columns_by_index(df, new_names):
     # Rename columns
     df.rename(columns=rename_dict, inplace=True)
     return df
+
+def make_diagnosis_tables(df_func, column_list):
+    """
+    make the statistical table of diagnosis rate, return a table
+    """
+    type_list = ["PET", "MRI"] # because type is more fixed, so I do not use a variable for it
+
+    res = np.zeros((3,len(column_list))) # for PET, MR, PET/MR; int(len(column_list))
+    res_percent = np.zeros((3,len(column_list)))
+    for i in range(len(type_list)):
+        n = df_func["Stade"].count()
+        for j in range(len(column_list)):
+            res[i,j] = (df_func[type_list[i]+" "+column_list[j]]==1).sum()
+            res_percent[i,j] = round(res[i,j]/n * 100, 2)
+            
+    for j in range(len(column_list)):
+        res[2,j] = ((df_func[type_list[0]+" "+column_list[j]]==1) | (df_func[type_list[1]+" "+column_list[j]]==1)).sum()
+        res_percent[2,j] = round(res[2,j]/n * 100, 2)
+    return res, res_percent
 
 rename_dict = {
     "BMI": "PET BMI",
@@ -64,16 +83,48 @@ df = read_my_csv(os.path.join(file_path,file_name))
 mri_idx = df.columns.get_loc('MRI global')
 
 df.rename(columns=rename_dict, inplace=True)
-df1 = df[diagnosis_elements]
 
-df_pre = df1[df1["Stade"]=="Pre-CAR-T-CELLS"]
-df_post = df1[df1["Stade"]=="Post-CAR-T-CELLS"]
-print(df1["Stade"].count(), df_pre["Stade"].count(), df_post["Stade"].count())
-assert(df1["Stade"].count() != df_pre["Stade"].count() + df_post["Stade"].count())
+####################################################################################
+"""choose the small area of the data to do the calculation of diagnosis performance test"""
+# df1 = df[diagnosis_elements]
 
-def make_tables(df, column_list):
-    """
-    """
+df_pre = df[df["Stade"]=="Pre-CAR-T-CELLS"]
+df_post = df[df["Stade"]=="Post-CAR-T-CELLS"]
 
-    res = ""
-    return res
+# if(df1["Stade"].count() != df_pre["Stade"].count() + df_post["Stade"].count()): 
+#     print("The number is not correct")
+#     # print(df1["Stade"].count(), df_pre["Stade"].count(), df_post["Stade"].count())
+
+# res, res_percent1 = make_diagnosis_tables(df_pre, column_list)
+# res, res_percent2 = make_diagnosis_tables(df_post, column_list)
+# res, res_percent3 = make_diagnosis_tables(df1, column_list)
+
+# """save it to csv files"""
+# arr = np.concatenate((res_percent1,res_percent2, res_percent3))
+# print(arr)
+# save_tables_diagnosis = "tables_diagnosis.csv"
+# np.savetxt(os.path.join(file_path,save_tables_diagnosis), arr, delimiter=',')
+#####################################################################################
+
+"""To draw a Kaplan-Meier Plot based on the current data"""
+def Kaplan_Meier_plot(df_func):
+    import matplotlib.pyplot as plt
+    from sksurv.nonparametric import kaplan_meier_estimator
+
+    
+    df_func = df_func[["P ou R", "PFS"]]
+    df_func["Event"] = df_func["P ou R"].notna()
+    print(df_func.head())
+    x, y, conf_int = kaplan_meier_estimator(df_func["Event"], df_func["PFS"], conf_type="log-log")
+    
+    plt.step(x, y, where="post")
+    plt.fill_between(x, conf_int[0], conf_int[1], alpha=0.25, step="post")
+    plt.ylim(0, 1)
+    plt.title('Kaplan-Meier Plot')
+    plt.xlabel('PFS(Month)')
+    plt.ylabel('Percentage')
+    plt.show()
+    # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
+    return
+
+Kaplan_Meier_plot(df_post)
