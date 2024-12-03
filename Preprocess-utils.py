@@ -127,4 +127,29 @@ def Kaplan_Meier_plot(df_func):
     # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
     return
 
-Kaplan_Meier_plot(df_post)
+def Kaplan_Meier_two_plot(df_func):
+    import matplotlib.pyplot as plt
+    from sksurv.nonparametric import kaplan_meier_estimator
+
+    df_func["Event"] = df_func["P ou R"].notna()
+    for treatment_type in ("Pre-CAR-T-CELLS", "Post-CAR-T-CELLS"):
+        mask_treat = df_func["Stade"] == treatment_type
+        time_treatment, survival_prob_treatment, conf_int = kaplan_meier_estimator(
+            df_func["Event"][mask_treat],
+            df_func["PFS"][mask_treat],
+            conf_type="log-log",
+        )
+        plt.step(time_treatment, survival_prob_treatment, where="post", label=f"Treatment = {treatment_type}")
+        plt.fill_between(time_treatment, conf_int[0], conf_int[1], alpha=0.25, step="post")
+
+    plt.ylim(0, 1)
+    plt.legend(loc="best")
+    
+    plt.title('Kaplan-Meier Plot')
+    plt.xlabel('PFS(Month)')
+    plt.ylabel('Percentage')
+    plt.show()
+    # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
+    return
+
+Kaplan_Meier_two_plot(df)
