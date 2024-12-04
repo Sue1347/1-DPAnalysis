@@ -16,6 +16,7 @@ def read_my_csv(file_path):
 def rename_columns_by_index(df, new_names):
     """
     Renames the columns of a DataFrame using their positional indices.
+    ...I really like this exmaples so I leave it here in case I want to learn...
     """
     # Convert column indices to names and create a rename map
     rename_dict = {df.columns[idx]: new_name for idx, new_name in new_names.items()}
@@ -83,13 +84,18 @@ df = read_my_csv(os.path.join(file_path,file_name))
 mri_idx = df.columns.get_loc('MRI global')
 
 df.rename(columns=rename_dict, inplace=True)
+df_test = df.iloc[5:10]
+print(df_test[["P ou R","PFS"]])
+# df = df.iloc[[]] # the test data is inside the training data! TODO : need to be fixed
+# print(df.head())
+# print(df_test.head())
 
 ####################################################################################
 """choose the small area of the data to do the calculation of diagnosis performance test"""
 # df1 = df[diagnosis_elements]
 
-df_pre = df[df["Stade"]=="Pre-CAR-T-CELLS"]
-df_post = df[df["Stade"]=="Post-CAR-T-CELLS"]
+# df_pre = df[df["Stade"]=="Pre-CAR-T-CELLS"]
+# df_post = df[df["Stade"]=="Post-CAR-T-CELLS"]
 
 # if(df1["Stade"].count() != df_pre["Stade"].count() + df_post["Stade"].count()): 
 #     print("The number is not correct")
@@ -99,57 +105,161 @@ df_post = df[df["Stade"]=="Post-CAR-T-CELLS"]
 # res, res_percent2 = make_diagnosis_tables(df_post, column_list)
 # res, res_percent3 = make_diagnosis_tables(df1, column_list)
 
-# """save it to csv files"""
+"""save it to csv files"""
 # arr = np.concatenate((res_percent1,res_percent2, res_percent3))
 # print(arr)
 # save_tables_diagnosis = "tables_diagnosis.csv"
 # np.savetxt(os.path.join(file_path,save_tables_diagnosis), arr, delimiter=',')
 #####################################################################################
 
+#####################################################################################
 """To draw a Kaplan-Meier Plot based on the current data"""
-def Kaplan_Meier_plot(df_func):
-    import matplotlib.pyplot as plt
-    from sksurv.nonparametric import kaplan_meier_estimator
+# def Kaplan_Meier_plot(df_func):
+#     import matplotlib.pyplot as plt
+#     from sksurv.nonparametric import kaplan_meier_estimator
 
     
-    df_func = df_func[["P ou R", "PFS"]]
-    df_func["Event"] = df_func["P ou R"].notna()
-    print(df_func.head())
-    x, y, conf_int = kaplan_meier_estimator(df_func["Event"], df_func["PFS"], conf_type="log-log")
+#     df_func = df_func[["P ou R", "PFS"]]
+#     df_func["Event"] = df_func["P ou R"].notna()
+#     print(df_func.head())
+#     x, y, conf_int = kaplan_meier_estimator(df_func["Event"], df_func["PFS"], conf_type="log-log")
     
-    plt.step(x, y, where="post")
-    plt.fill_between(x, conf_int[0], conf_int[1], alpha=0.25, step="post")
-    plt.ylim(0, 1)
-    plt.title('Kaplan-Meier Plot')
-    plt.xlabel('PFS(Month)')
-    plt.ylabel('Percentage')
-    plt.show()
-    # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
-    return
+#     plt.step(x, y, where="post")
+#     plt.fill_between(x, conf_int[0], conf_int[1], alpha=0.25, step="post")
+#     plt.ylim(0, 1)
+#     plt.title('Kaplan-Meier Plot')
+#     plt.xlabel('PFS(Month)')
+#     plt.ylabel('Percentage')
+#     plt.show()
+#     # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
+#     return
 
-def Kaplan_Meier_two_plot(df_func):
+# def Kaplan_Meier_two_plot(df_func):
+#     import matplotlib.pyplot as plt
+#     from sksurv.nonparametric import kaplan_meier_estimator
+
+#     df_func["Event"] = df_func["P ou R"].notna()
+#     for treatment_type in ("Pre-CAR-T-CELLS", "Post-CAR-T-CELLS"):
+#         mask_treat = df_func["Stade"] == treatment_type
+#         time_treatment, survival_prob_treatment, conf_int = kaplan_meier_estimator(
+#             df_func["Event"][mask_treat],
+#             df_func["PFS"][mask_treat],
+#             conf_type="log-log",
+#         )
+#         plt.step(time_treatment, survival_prob_treatment, where="post", label=f"Treatment = {treatment_type}")
+#         plt.fill_between(time_treatment, conf_int[0], conf_int[1], alpha=0.25, step="post")
+
+#     plt.ylim(0, 1)
+#     plt.legend(loc="best")
+    
+#     plt.title('Kaplan-Meier Plot')
+#     plt.xlabel('PFS(Month)')
+#     plt.ylabel('Percentage')
+#     plt.show()
+#     # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
+#     return
+
+# Kaplan_Meier_two_plot(df)
+#################################################################################
+
+"""Do the Cox PH survival analysis"""
+
+# transform all data into numeric values
+
+def make_one_hot_data(df_func, column_list):
+    """Given some list of characteristics that can eveluate the survival """
+    # print(column_list)
+    # print(df_func.head())
+    
+    df_func = df_func[column_list]
+    df_func = df_func.fillna(0)
+    onehot_list = ["Stade", "Ig"]
+    # print(df_func.head())
+    # print(df_func["Stade"].value_counts())
+    # print(df_func["Ig"].value_counts())
+
+    for i in range(len(onehot_list)):
+        type_list = list(df_func[onehot_list[i]].unique())
+        for j in range(len(type_list)):
+            if type_list[j] == 0:
+                df_func[onehot_list[i]+"=NaN"]= df_func[onehot_list[i]] == type_list[j]
+                df_func[onehot_list[i]+"=NaN"] = df_func[onehot_list[i]+"=NaN"].astype(int)
+                column_list.append(onehot_list[i]+"=NaN")
+                continue
+            # print(onehot_list[i],"=",type_list[j])
+            df_func[onehot_list[i]+"="+type_list[j]]= df_func[onehot_list[i]] == type_list[j]
+            df_func[onehot_list[i]+"="+type_list[j]] = df_func[onehot_list[i]+"="+type_list[j]].astype(int)
+            column_list.append(onehot_list[i]+"="+type_list[j])
+        column_list.remove(onehot_list[i])
+    
+    # print(df_func.head())
+    # data_x_numeric = OneHotEncoder().fit_transform(df_func)
+    df_func = df_func.drop(columns = onehot_list)
+    print(df_func.columns)
+
+    return df_func,column_list
+
+cox_pre_column_list = ["Age", "Stade", "Ig", "SUVmaxBM", "SUVmaxFL", "ADCMeanBMI", "ADCMeanFL"]
+df_onehot, cox_column_list = make_one_hot_data(df, cox_pre_column_list)
+
+cox_pre_column_list = ["Age", "Stade", "Ig", "SUVmaxBM", "SUVmaxFL", "ADCMeanBMI", "ADCMeanFL"]
+df_onehot_test, cox_column_list_test = make_one_hot_data(df_test, cox_pre_column_list)
+# print("dataframe onehot test:",df_onehot_test)
+
+
+df_pfs = df[["PFS"]].astype(float)
+df_pfs["Event"] = df["P ou R"].notna().astype(int)
+df_pfs = df_pfs[["Event","PFS"]]
+
+def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
+    from sklearn import set_config
+    from sksurv.linear_model import CoxPHSurvivalAnalysis
     import matplotlib.pyplot as plt
-    from sksurv.nonparametric import kaplan_meier_estimator
 
-    df_func["Event"] = df_func["P ou R"].notna()
-    for treatment_type in ("Pre-CAR-T-CELLS", "Post-CAR-T-CELLS"):
-        mask_treat = df_func["Stade"] == treatment_type
-        time_treatment, survival_prob_treatment, conf_int = kaplan_meier_estimator(
-            df_func["Event"][mask_treat],
-            df_func["PFS"][mask_treat],
-            conf_type="log-log",
-        )
-        plt.step(time_treatment, survival_prob_treatment, where="post", label=f"Treatment = {treatment_type}")
-        plt.fill_between(time_treatment, conf_int[0], conf_int[1], alpha=0.25, step="post")
+    set_config(display="text")  # displays text representation of estimators
+    
+    # print(df_pfs.head())
+    # print(df_onehot.head())
+    # Define the structured dtype
+    dtype = [('Status', '?'), ('Survival_in_days', '<f8')]  # '?' for boolean, '<f8' for float
 
-    plt.ylim(0, 1)
+    # Convert DataFrame to structured array
+    structured_array = np.array(list(df_pfs.itertuples(index=False, name=None)), dtype=dtype)
+    # print(structured_array)
+
+    estimator = CoxPHSurvivalAnalysis()
+    estimator.fit(df_onehot, structured_array)
+
+    print("Coefficients: \n",pd.Series(estimator.coef_, index=df_onehot.columns))
+
+    """make a test""" 
+    # Find columns in B but not in A
+    missing_columns = set(df_onehot.columns) - set(df_onehot_test.columns)
+
+    # Add missing columns to A with value 0
+    for col in missing_columns:
+        df_onehot_test[col] = 0
+
+    # Ensure column order matches B
+    df_onehot_test = df_onehot_test[df_onehot.columns]
+
+    pred_surv = estimator.predict_survival_function(df_onehot_test)
+    time_points = np.arange(1, 41)
+    for i, surv_func in enumerate(pred_surv):
+        plt.step(time_points, surv_func(time_points), where="post", label=f"Sample {i + 1}")
+    plt.ylabel(r"est. probability of survival $\hat{S}(t)$")
+    plt.xlabel("time $t$")
     plt.legend(loc="best")
-    
-    plt.title('Kaplan-Meier Plot')
-    plt.xlabel('PFS(Month)')
-    plt.ylabel('Percentage')
     plt.show()
-    # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
+    
+    print("estimator score",estimator.score(df_onehot, structured_array))
+
     return
 
-Kaplan_Meier_two_plot(df)
+cox_PH_model(df_onehot,df_pfs, df_onehot_test)
+
+"""save it to csv files"""
+# print(res)
+# save_tables_cox = "tables_cox.csv"
+# np.savetxt(os.path.join(file_path,save_tables_cox), res, delimiter=',')
+
