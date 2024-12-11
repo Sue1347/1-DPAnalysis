@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 file_path = "/home/kevin/Downloads/Datasets/DiagProgAnalysis"
-file_name = "simple-dataset.csv"
+file_name = "simple-dataset-v2.csv"
 
 def read_my_csv(file_path):
     """
@@ -84,11 +84,25 @@ df = read_my_csv(os.path.join(file_path,file_name))
 mri_idx = df.columns.get_loc('MRI global')
 
 df.rename(columns=rename_dict, inplace=True)
-df_test = df.iloc[5:10]
-print(df_test[["P ou R","PFS"]])
-# df = df.iloc[[]] # the test data is inside the training data! TODO : need to be fixed
+# print(df["Ig"].value_counts(normalize=True))
+print("SUVmaxBM: ",df["SUVmaxBM"].mean(),df["SUVmaxBM"].std())
+# print(df["SUVmaxBM"])
 # print(df.head())
+print(df["ADCMeanBMI"].mean(),df["ADCMeanBMI"].std())
 # print(df_test.head())
+
+##########################################################################
+"""the basic data of the dataset"""
+
+# print(len(df.columns))
+# nan_percentage = df.isna().mean() * 100
+# count_n50 = 0
+# for column, percentage in nan_percentage.items():
+#     if percentage >= 50: count_n50+=1
+#     print(f"{column}: {percentage:.2f}%")
+# print(count_n50, " is larger than 50%.")
+##################################################################################
+
 
 ####################################################################################
 """choose the small area of the data to do the calculation of diagnosis performance test"""
@@ -105,9 +119,10 @@ print(df_test[["P ou R","PFS"]])
 # res, res_percent2 = make_diagnosis_tables(df_post, column_list)
 # res, res_percent3 = make_diagnosis_tables(df1, column_list)
 
-"""save it to csv files"""
 # arr = np.concatenate((res_percent1,res_percent2, res_percent3))
 # print(arr)
+
+# save it to csv files
 # save_tables_diagnosis = "tables_diagnosis.csv"
 # np.savetxt(os.path.join(file_path,save_tables_diagnosis), arr, delimiter=',')
 #####################################################################################
@@ -130,6 +145,7 @@ print(df_test[["P ou R","PFS"]])
 #     plt.title('Kaplan-Meier Plot')
 #     plt.xlabel('PFS(Month)')
 #     plt.ylabel('Percentage')
+#     # plt.legend(loc="best")
 #     plt.show()
 #     # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
 #     return
@@ -159,12 +175,20 @@ print(df_test[["P ou R","PFS"]])
 #     # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
 #     return
 
-# Kaplan_Meier_two_plot(df)
+# Kaplan_Meier_plot(df)
 #################################################################################
 
-"""Do the Cox PH survival analysis"""
+
+###################################################################################
+"""the Cox PH survival analysis"""
 
 # transform all data into numeric values
+from sklearn import set_config
+from sksurv.linear_model import CoxPHSurvivalAnalysis
+from sksurv.ensemble import RandomSurvivalForest
+import matplotlib.pyplot as plt
+
+df_test = df.iloc[5:10]
 
 def make_one_hot_data(df_func, column_list):
     """Given some list of characteristics that can eveluate the survival """
@@ -204,22 +228,16 @@ df_onehot, cox_column_list = make_one_hot_data(df, cox_pre_column_list)
 
 cox_pre_column_list = ["Age", "Stade", "Ig", "SUVmaxBM", "SUVmaxFL", "ADCMeanBMI", "ADCMeanFL"]
 df_onehot_test, cox_column_list_test = make_one_hot_data(df_test, cox_pre_column_list)
-# print("dataframe onehot test:",df_onehot_test)
-
+print("dataframe onehot test:",df_onehot_test)
 
 df_pfs = df[["PFS"]].astype(float)
 df_pfs["Event"] = df["P ou R"].notna().astype(int)
 df_pfs = df_pfs[["Event","PFS"]]
 
 def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
-    from sklearn import set_config
-    from sksurv.linear_model import CoxPHSurvivalAnalysis
-    import matplotlib.pyplot as plt
 
     set_config(display="text")  # displays text representation of estimators
     
-    # print(df_pfs.head())
-    # print(df_onehot.head())
     # Define the structured dtype
     dtype = [('Status', '?'), ('Survival_in_days', '<f8')]  # '?' for boolean, '<f8' for float
 
@@ -228,35 +246,83 @@ def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
     # print(structured_array)
 
     estimator = CoxPHSurvivalAnalysis()
+    
     estimator.fit(df_onehot, structured_array)
+    print("estimator score",estimator.score(df_onehot, structured_array))
 
     print("Coefficients: \n",pd.Series(estimator.coef_, index=df_onehot.columns))
+
+    """show what's influence best"""
+    n_features = df_onehot.values.shape[1]
+    scores = np.empty(n_features)
+    m = CoxPHSurvivalAnalysis()
+    for j in range(n_features):
+        Xj = df_onehot.values[:, j : j + 1]
+        m.fit(Xj, structured_array)
+        scores[j] = m.score(Xj, structured_array)
+
+    print("scores: \n",pd.Series(scores, index=df_onehot.columns).sort_values(ascending=False))
 
     """make a test""" 
     # Find columns in B but not in A
     missing_columns = set(df_onehot.columns) - set(df_onehot_test.columns)
-
     # Add missing columns to A with value 0
     for col in missing_columns:
         df_onehot_test[col] = 0
-
     # Ensure column order matches B
     df_onehot_test = df_onehot_test[df_onehot.columns]
 
     pred_surv = estimator.predict_survival_function(df_onehot_test)
+
     time_points = np.arange(1, 41)
     for i, surv_func in enumerate(pred_surv):
         plt.step(time_points, surv_func(time_points), where="post", label=f"Sample {i + 1}")
-    plt.ylabel(r"est. probability of survival $\hat{S}(t)$")
+    plt.ylabel(r"probability of survival") # $\hat{S}(t)$
     plt.xlabel("time $t$")
     plt.legend(loc="best")
     plt.show()
     
+    return 
+
+def RandomForest_model(df_onehot, df_pfs, df_onehot_test):
+    dtype = [('Status', '?'), ('Survival_in_days', '<f8')]  # '?' for boolean, '<f8' for float
+
+    # Convert DataFrame to structured array
+    structured_array = np.array(list(df_pfs.itertuples(index=False, name=None)), dtype=dtype)
+    # print(structured_array)
+
+    # estimator = CoxPHSurvivalAnalysis()
+    estimator = RandomSurvivalForest(
+    n_estimators=1000, min_samples_split=10, min_samples_leaf=15, n_jobs=-1, random_state=20)
+    
+    
+    estimator.fit(df_onehot, structured_array)
     print("estimator score",estimator.score(df_onehot, structured_array))
+    
+
+    # Find columns in B but not in A
+    missing_columns = set(df_onehot.columns) - set(df_onehot_test.columns)
+    # Add missing columns to A with value 0
+    for col in missing_columns:
+        df_onehot_test[col] = 0
+    # Ensure column order matches B
+    df_onehot_test = df_onehot_test[df_onehot.columns]
+    
+    surv = estimator.predict_survival_function(df_onehot_test, return_array=True)
+
+    for i, s in enumerate(surv):
+        plt.step(estimator.unique_times_, s, where="post", label=f"Sample {i + 1}")
+    plt.ylabel("Survival probability")
+    plt.xlabel("Time in months")
+    plt.legend()
+    # plt.grid(True)
+    plt.show()
 
     return
+ 
+# cox_PH_model(df_onehot,df_pfs, df_onehot_test)
+# RandomForest_model(df_onehot,df_pfs, df_onehot_test)
 
-cox_PH_model(df_onehot,df_pfs, df_onehot_test)
 
 """save it to csv files"""
 # print(res)
