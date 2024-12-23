@@ -1,6 +1,8 @@
 import pandas as pd
 import os
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 file_path = "/home/kevin/Downloads/Datasets/DiagProgAnalysis"
 file_name = "simple-dataset-v2.csv"
@@ -45,6 +47,8 @@ def make_diagnosis_tables(df_func, column_list):
     return res, res_percent
 
 rename_dict = {
+    "TEP Global": "PET Global",
+    "MRI global": "MRI Global",
     "BMI": "PET BMI",
     "FL": "PET FL",
     "Number FLs": "PET Number FLs",
@@ -62,6 +66,7 @@ rename_dict = {
 }
 diagnosis_elements = [
     "Stade",
+    "PET Global",
     "PET BMI",
     "PET FL",
     "PET Number FLs",
@@ -69,6 +74,7 @@ diagnosis_elements = [
     "PET Number EMD",
     "PET PMD",
     "PET Number EMD",
+    "MRI Global",
     "MRI BMI",
     "MRI FL",
     "MRI Number FLs",
@@ -77,7 +83,7 @@ diagnosis_elements = [
     "MRI PMD",
     "MRI Number EMD",
     ]
-column_list = ["FL", "BMI", "EMD", "PMD"]
+column_list = ["Global","FL", "BMI", "EMD", "PMD"]
 
 
 df = read_my_csv(os.path.join(file_path,file_name))
@@ -93,8 +99,47 @@ print(df["ADCMeanBMI"].mean(),df["ADCMeanBMI"].std())
 
 ##########################################################################
 """the basic data of the dataset"""
+# df.loc[df['P ou R'].isna(), 'PFS'] = np.nan
+# df.loc[df['Deces'].isna(), 'OS'] = np.nan
+# df.loc[df['PET BMI']== 0, 'SUVmaxBM'] = np.nan
+# df.loc[df['MRI BMI']== 0, 'ADCMeanBMI'] = np.nan
 
-# print(len(df.columns))
+df_pre = df[df["Stade"]=="Pre-CAR-T-CELLS"]
+df_post = df[df["Stade"]=="Post-CAR-T-CELLS"]
+
+print(df.columns)
+
+# continuous_list = ['Age', 'Ratio k/l', 'PFS', 'OS', 'ISS',
+#         'SUVmaxBM',  'SUVmaxFL', 'SUVmaxEMD', 'SUVmaxPMD', 
+#         'FF BM', 'FF FL', 
+#         'ADCMeanBMI', 'ADCMeanFL', 'ADCMean EMD', 'ADCMean PMD'] 
+# #  'T(4 14)', 'del 17p', 'duplication 1q', 'R-ISS', 'Traitement', 
+
+# df_now = df_post[continuous_list]
+
+# for i in df_now.columns:
+    
+#     print(i,df_now[i].mean(), df_now[i].std())
+
+
+
+
+"""Create Box plots for characteristics"""
+
+# Convert the DataFrame to long format for Seaborn
+# df_long = df_now[['PFS', 'OS']].melt(var_name='Category', value_name='Value')
+
+# Create the box plot
+# plt.figure(figsize=(10, 6))
+# sns.boxplot(x='Category', y='Value', data=df_long)
+# plt.title("Box Plot for PFS and OS (post treatment)")
+# # plt.xlabel("Categories")
+# plt.ylabel("Time")
+# plt.grid(axis='y')  # Add a grid for better readability
+# plt.show()
+
+"""Percentage of missing Characteristics"""
+
 # nan_percentage = df.isna().mean() * 100
 # count_n50 = 0
 # for column, percentage in nan_percentage.items():
@@ -106,21 +151,18 @@ print(df["ADCMeanBMI"].mean(),df["ADCMeanBMI"].std())
 
 ####################################################################################
 """choose the small area of the data to do the calculation of diagnosis performance test"""
-# df1 = df[diagnosis_elements]
-
-# df_pre = df[df["Stade"]=="Pre-CAR-T-CELLS"]
-# df_post = df[df["Stade"]=="Post-CAR-T-CELLS"]
+# Post=='Reponse', 'TEP Global','PET BMI', 'PET FL','PET EMD','PET PMD','MRI global', 'MRI BMI','MRI FL','MRI EMD','MRI PMD',
 
 # if(df1["Stade"].count() != df_pre["Stade"].count() + df_post["Stade"].count()): 
 #     print("The number is not correct")
-#     # print(df1["Stade"].count(), df_pre["Stade"].count(), df_post["Stade"].count())
-
-# res, res_percent1 = make_diagnosis_tables(df_pre, column_list)
-# res, res_percent2 = make_diagnosis_tables(df_post, column_list)
+    # print(df1["Stade"].count(), df_pre["Stade"].count(), df_post["Stade"].count())
+print(df_post["Reponse"].value_counts(normalize=False)) # True
+res_1, res_percent1 = make_diagnosis_tables(df_pre, column_list)
+res_2, res_percent2 = make_diagnosis_tables(df_post[df_post["Reponse"]=="PR"], column_list)
 # res, res_percent3 = make_diagnosis_tables(df1, column_list)
 
-# arr = np.concatenate((res_percent1,res_percent2, res_percent3))
-# print(arr)
+arr = np.concatenate((res_1,res_2))
+print(arr)
 
 # save it to csv files
 # save_tables_diagnosis = "tables_diagnosis.csv"
@@ -223,16 +265,16 @@ def make_one_hot_data(df_func, column_list):
 
     return df_func,column_list
 
-cox_pre_column_list = ["Age", "Stade", "Ig", "SUVmaxBM", "SUVmaxFL", "ADCMeanBMI", "ADCMeanFL"]
-df_onehot, cox_column_list = make_one_hot_data(df, cox_pre_column_list)
+# cox_pre_column_list = ["Age", "Stade", "Ig", "SUVmaxBM", "SUVmaxFL", "ADCMeanBMI", "ADCMeanFL"]
+# df_onehot, cox_column_list = make_one_hot_data(df, cox_pre_column_list)
 
-cox_pre_column_list = ["Age", "Stade", "Ig", "SUVmaxBM", "SUVmaxFL", "ADCMeanBMI", "ADCMeanFL"]
-df_onehot_test, cox_column_list_test = make_one_hot_data(df_test, cox_pre_column_list)
-print("dataframe onehot test:",df_onehot_test)
+# cox_pre_column_list = ["Age", "Stade", "Ig", "SUVmaxBM", "SUVmaxFL", "ADCMeanBMI", "ADCMeanFL"]
+# df_onehot_test, cox_column_list_test = make_one_hot_data(df_test, cox_pre_column_list)
+# print("dataframe onehot test:",df_onehot_test)
 
-df_pfs = df[["PFS"]].astype(float)
-df_pfs["Event"] = df["P ou R"].notna().astype(int)
-df_pfs = df_pfs[["Event","PFS"]]
+# df_pfs = df[["PFS"]].astype(float)
+# df_pfs["Event"] = df["P ou R"].notna().astype(int)
+# df_pfs = df_pfs[["Event","PFS"]]
 
 def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
 
