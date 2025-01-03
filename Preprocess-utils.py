@@ -156,13 +156,13 @@ print(df.columns)
 # if(df1["Stade"].count() != df_pre["Stade"].count() + df_post["Stade"].count()): 
 #     print("The number is not correct")
     # print(df1["Stade"].count(), df_pre["Stade"].count(), df_post["Stade"].count())
-print(df_post["Reponse"].value_counts(normalize=False)) # True
-res_1, res_percent1 = make_diagnosis_tables(df_pre, column_list)
-res_2, res_percent2 = make_diagnosis_tables(df_post[df_post["Reponse"]=="PR"], column_list)
+# print(df_post["Reponse"].value_counts(normalize=False)) # True
+# res_1, res_percent1 = make_diagnosis_tables(df_pre, column_list)
+# res_2, res_percent2 = make_diagnosis_tables(df_post[df_post["Reponse"]=="CR"], column_list)
 # res, res_percent3 = make_diagnosis_tables(df1, column_list)
 
-arr = np.concatenate((res_1,res_2))
-print(arr)
+# arr = np.concatenate((res_1,res_2))
+# print(arr)
 
 # save it to csv files
 # save_tables_diagnosis = "tables_diagnosis.csv"
@@ -230,7 +230,7 @@ from sksurv.linear_model import CoxPHSurvivalAnalysis
 from sksurv.ensemble import RandomSurvivalForest
 import matplotlib.pyplot as plt
 
-df_test = df.iloc[5:10]
+
 
 def make_one_hot_data(df_func, column_list):
     """Given some list of characteristics that can eveluate the survival """
@@ -272,9 +272,26 @@ def make_one_hot_data(df_func, column_list):
 # df_onehot_test, cox_column_list_test = make_one_hot_data(df_test, cox_pre_column_list)
 # print("dataframe onehot test:",df_onehot_test)
 
-# df_pfs = df[["PFS"]].astype(float)
-# df_pfs["Event"] = df["P ou R"].notna().astype(int)
-# df_pfs = df_pfs[["Event","PFS"]]
+df_pfs = df_pre[["PFS"]].astype(float)
+df_pfs["Event"] = df_pre["P ou R"].notna().astype(int)
+df_pfs = df_pfs[["Event","PFS"]]
+
+cox_column_list = ['Age', 
+       'PET Global', 'PET BMI', 'SUVmaxBM', 'PET FL', 'SUVmaxFL',
+       
+       'MRI Global', 'MRI BMI', 'ADCMeanBMI', 'MRI FL',
+       'ADCMeanFL',] 
+# 'PET EMD', 'SUVmaxEMD', 'PET PMD', 'SUVmaxPMD', 
+#  'MRI EMD', 'ADCMean EMD', 'MRI PMD', 'ADCMean PMD'
+# 'Ratio k/l', 'ISS', 'FF BM', 'FF FL', 
+# maybe because of the high values ValueError: LAPACK reported an illegal value in 5-th argument.
+# print(df_pre[cox_column_list].fillna(0).head())
+
+df_pre = df_pre[cox_column_list].fillna(0)
+df_pre_norm = (df_pre-df_pre.min())/(df_pre.max()-df_pre.min())
+
+df_test = df_pre_norm.iloc[5:10]
+
 
 def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
 
@@ -293,6 +310,8 @@ def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
     print("estimator score",estimator.score(df_onehot, structured_array))
 
     print("Coefficients: \n",pd.Series(estimator.coef_, index=df_onehot.columns))
+
+    print("Hazard Ratio: \n",np.exp(estimator.coef_))
 
     """show what's influence best"""
     n_features = df_onehot.values.shape[1]
@@ -362,8 +381,8 @@ def RandomForest_model(df_onehot, df_pfs, df_onehot_test):
 
     return
  
-# cox_PH_model(df_onehot,df_pfs, df_onehot_test)
-# RandomForest_model(df_onehot,df_pfs, df_onehot_test)
+cox_PH_model(df_pre_norm, df_pfs, df_test)
+# RandomForest_model(df_pre_norm, df_pfs, df_test)
 
 
 """save it to csv files"""

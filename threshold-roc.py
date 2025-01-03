@@ -5,6 +5,7 @@ from sklearn.metrics import roc_curve
 from sksurv.metrics import cumulative_dynamic_auc
 from sksurv.util import Surv
 import os
+from lifelines.statistics import logrank_test
 
 # Example DataFrame
 # df = pd.DataFrame({
@@ -53,12 +54,17 @@ time_points = np.linspace(1, max(df["PFS"])-1, max(df["PFS"])-2)  # Create time 
 
 
 var_list = ["Age", "SUVmaxBM", "SUVmaxFL", "ADCMeanBMI", "ADCMeanFL"]
+cox_column_list = ["Age", "SUVmaxBM", "SUVmaxFL",'SUVmaxEMD', 'SUVmaxPMD', "ADCMeanBMI", "ADCMeanFL",'ADCMean EMD', 'ADCMean PMD']
+# 'PET EMD',  'PET PMD', 
+#  'MRI EMD', 'MRI PMD',
+# 'Ratio k/l', 'ISS', 'FF BM', 'FF FL', 
+var_list = cox_column_list
+thresholds_lists = []
 
 
 for var in var_list:
     print("Var: ",var)
     # print(len(survival_data), len(df[var]))
-    # print(df[var])
 
     # Compute time-dependent AUC and ROC metrics
     auc_times, auc_scores = cumulative_dynamic_auc(
@@ -67,17 +73,17 @@ for var in var_list:
         df[var], 
         times=time_points
     )
-    print("auc_scores: \n",auc_scores)
-    print("auc_times: \n",auc_times)
+    print("time average auc_scores: ",auc_scores)
+    # print("auc_times: \n",auc_times)
 
-    print(df["event"], df[var])
     # Calculate traditional ROC metrics
     fpr, tpr, thresholds = roc_curve(df["event"], df[var])
     optimal_idx = np.argmax(tpr - fpr)
     optimal_threshold = thresholds[optimal_idx]
+    thresholds_lists.append(optimal_threshold)
 
     # Print optimal threshold
-    print("Optimal Threshold:", optimal_threshold)
+    print("Optimal Threshold:", optimal_threshold, "\n")
 
     # Function to plot ROC curve
     def plot_roc_curve(fpr, tpr, auc_score, optimal_idx=None):
@@ -96,7 +102,7 @@ for var in var_list:
         
         plt.xlabel("False Positive Rate (1-Specificity)")
         plt.ylabel("True Positive Rate (Sensitivity)")
-        plt.title("ROC Curve")
+        plt.title("ROC Curve: "+var)
         plt.legend(loc="lower right")
         plt.grid(alpha=0.3)
         plt.show()
@@ -104,21 +110,19 @@ for var in var_list:
     # Calculate AUC using scikit-learn's roc_auc_score
     from sklearn.metrics import roc_auc_score
     auc_score = roc_auc_score(df["event"], df[var])
-    print("auc_score for scikit-learn's roc_auc_score: ", auc_score)
+    # print("auc_score for scikit-learn's roc_auc_score: ", auc_score) # the same as the above
 
     # Plot ROC curve
-    plot_roc_curve(fpr, tpr, auc_score, optimal_idx)
+    # plot_roc_curve(fpr, tpr, auc_score, optimal_idx)
+    # df[var+"_thrshd"] = df[var]>optimal_threshold
+    T1 = df.loc[(df[var] > optimal_threshold),"PFS"]
+    T2 = df.loc[(df[var] <= optimal_threshold),"PFS"]
+    E1 = df.loc[(df[var] > optimal_threshold),"event"]
+    E2 = df.loc[(df[var] <= optimal_threshold),"event"]
 
-    """Plot time-dependent ROC"""
-    # plt.figure(figsize=(10, 6))
-    # for i, time in enumerate(time_points):
-    #     plt.plot(
-    #         [0, 1], [0, 1], "k--", label="Random Guess" if i == 0 else ""
-    #     )  # Diagonal line
-    #     plt.scatter(1 - auc_times[i], auc_scores[i], label=f"Time {time:.1f}")
-    # plt.xlabel("1 - Specificity (False Positive Rate)")
-    # plt.ylabel("Sensitivity (True Positive Rate)")
-    # plt.title("Time-Dependent ROC Curve")
-    # plt.legend()
-    # plt.grid()
-    # plt.show()
+    results = logrank_test(T1, T2, event_observed_A=E1, event_observed_B=E2)
+    results.print_summary()
+    # print(results.p_value)        # 
+    # print(results.test_statistic) # 
+
+# print(thresholds_lists)
