@@ -6,23 +6,24 @@ from sksurv.metrics import cumulative_dynamic_auc
 from sksurv.util import Surv
 import os
 from lifelines.statistics import logrank_test
+from sklearn.metrics import roc_auc_score
+from sklearn import set_config
+from sksurv.linear_model import CoxPHSurvivalAnalysis
 
-# Example DataFrame
-# df = pd.DataFrame({
-#     "time": [5, 10, 15, 20, 25],
-#     "event": [1, 1, 0, 1, 0],
-#     "SUVmaxBM": [0.2, 0.4, 0.6, 0.8, 1.0]
-# })
+import matplotlib.pyplot as plt
+
 
 file_path = "/home/kevin/Downloads/Datasets/DiagProgAnalysis"
 file_name = "simple-dataset-v2.csv"
 df = pd.read_csv(os.path.join(file_path,file_name))
 
-df = df[df["Stade"]=="Pre-CAR-T-CELLS"]
+df = df[df["Stade"]=="Pre-CAR-T-CELLS"] # Pre
 # df_post = df[df["Stade"]=="Post-CAR-T-CELLS"]
 
 # organize the data into 
 rename_dict = {
+    "TEP Global": "PET Global",
+    "MRI global": "MRI Global",
     "BMI": "PET BMI",
     "FL": "PET FL",
     "Number FLs": "PET Number FLs",
@@ -45,7 +46,6 @@ df["event"] = df["P ou R"].notna()
 df = df.fillna(0.0001)
 # Create structured array for survival data
 survival_data = Surv.from_dataframe(event="event", time="PFS", data=df)
-
 
 
 # Define time points of interest
@@ -83,7 +83,7 @@ for var in var_list:
     thresholds_lists.append(optimal_threshold)
 
     # Print optimal threshold
-    print("Optimal Threshold:", optimal_threshold, "\n")
+    print("Optimal Threshold:", optimal_threshold)
 
     # Function to plot ROC curve
     def plot_roc_curve(fpr, tpr, auc_score, optimal_idx=None):
@@ -108,21 +108,97 @@ for var in var_list:
         plt.show()
 
     # Calculate AUC using scikit-learn's roc_auc_score
-    from sklearn.metrics import roc_auc_score
     auc_score = roc_auc_score(df["event"], df[var])
     # print("auc_score for scikit-learn's roc_auc_score: ", auc_score) # the same as the above
 
     # Plot ROC curve
     # plot_roc_curve(fpr, tpr, auc_score, optimal_idx)
-    # df[var+"_thrshd"] = df[var]>optimal_threshold
-    T1 = df.loc[(df[var] > optimal_threshold),"PFS"]
-    T2 = df.loc[(df[var] <= optimal_threshold),"PFS"]
-    E1 = df.loc[(df[var] > optimal_threshold),"event"]
-    E2 = df.loc[(df[var] <= optimal_threshold),"event"]
+
+    df[var+"_thrshd"] = df[var]>=optimal_threshold
+
+    T1 = df.loc[(df[var] >= optimal_threshold),"PFS"]
+    T2 = df.loc[(df[var] < optimal_threshold),"PFS"]
+    E1 = df.loc[(df[var] >= optimal_threshold),"event"]
+    E2 = df.loc[(df[var] < optimal_threshold),"event"]
 
     results = logrank_test(T1, T2, event_observed_A=E1, event_observed_B=E2)
-    results.print_summary()
-    # print(results.p_value)        # 
+    # results.print_summary()
+    # print("p value: ",results.p_value)        # 
     # print(results.test_statistic) # 
 
 # print(thresholds_lists)
+
+"""Cox PH model based on thresholds"""
+df_pfs = df[["PFS"]].astype(float)
+df_pfs["Event"] = df["P ou R"].notna().astype(int)
+df_pfs = df_pfs[["Event","PFS"]]
+
+cox_column_list = ['Age_thrshd', 
+       'PET Global', 'PET BMI','SUVmaxBM_thrshd','PET FL', 'SUVmaxFL_thrshd', 'PET EMD', 'SUVmaxEMD_thrshd', 'PET PMD', 'SUVmaxPMD_thrshd', 
+       'MRI Global', 'MRI BMI','ADCMeanBMI_thrshd', 'MRI FL', 'ADCMeanFL_thrshd',
+       ] 
+#     
+#  'MRI EMD', 'ADCMean EMD', 'MRI PMD', 'ADCMean PMD' 
+# 'Ratio k/l', 'ISS', 'FF BM', 'FF FL', 
+# maybe because of the high values ValueError: LAPACK reported an illegal value in 5-th argument.
+# print(df_pre[cox_column_list].fillna(0).head())
+
+df_pre = df[cox_column_list].fillna(0)
+# df_pre_norm = (df_pre-df_pre.min())/(df_pre.max()-df_pre.min())
+
+df_test = df_pre.iloc[5:10]
+
+
+def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
+
+    set_config(display="text")  # displays text representation of estimators
+    
+    # Define the structured dtype
+    dtype = [('Status', '?'), ('Survival_in_days', '<f8')]  # '?' for boolean, '<f8' for float
+
+    # Convert DataFrame to structured array
+    structured_array = np.array(list(df_pfs.itertuples(index=False, name=None)), dtype=dtype)
+    # print(structured_array)
+
+    estimator = CoxPHSurvivalAnalysis()
+    
+    estimator.fit(df_onehot, structured_array)
+    print("estimator score",estimator.score(df_onehot, structured_array))
+
+    print("Coefficients: \n",pd.Series(estimator.coef_, index=df_onehot.columns))
+
+    print("Hazard Ratio: \n",np.exp(estimator.coef_))
+
+    """show what's influence best"""
+    n_features = df_onehot.values.shape[1]
+    scores = np.empty(n_features)
+    m = CoxPHSurvivalAnalysis()
+    for j in range(n_features):
+        Xj = df_onehot.values[:, j : j + 1]
+        m.fit(Xj, structured_array)
+        scores[j] = m.score(Xj, structured_array)
+
+    print("scores: \n",pd.Series(scores, index=df_onehot.columns).sort_values(ascending=False))
+
+    """make a test""" 
+    # Find columns in B but not in A
+    missing_columns = set(df_onehot.columns) - set(df_onehot_test.columns)
+    # Add missing columns to A with value 0
+    for col in missing_columns:
+        df_onehot_test[col] = 0
+    # Ensure column order matches B
+    df_onehot_test = df_onehot_test[df_onehot.columns]
+
+    pred_surv = estimator.predict_survival_function(df_onehot_test)
+
+    time_points = np.arange(1, 41)
+    for i, surv_func in enumerate(pred_surv):
+        plt.step(time_points, surv_func(time_points), where="post", label=f"Sample {i + 1}")
+    plt.ylabel(r"probability of survival") # $\hat{S}(t)$
+    plt.xlabel("time $t$")
+    plt.legend(loc="best")
+    plt.show()
+    
+    return 
+
+cox_PH_model(df_pre, df_pfs, df_test)

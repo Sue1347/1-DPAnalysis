@@ -83,7 +83,7 @@ diagnosis_elements = [
     "MRI PMD",
     "MRI Number EMD",
     ]
-column_list = ["Global","FL", "BMI", "EMD", "PMD"]
+column_list = ["Global","FL", "BMI", "EMD", "PMD"] #
 
 
 df = read_my_csv(os.path.join(file_path,file_name))
@@ -121,6 +121,28 @@ print(df.columns)
     
 #     print(i,df_now[i].mean(), df_now[i].std())
 
+""" Fisher's Exact Test for diagnosis performance"""
+def fishers_exact(df,var_list):
+    import scipy.stats as stats
+    for var in var_list:
+        print(var)
+        a = df["PET "+var].value_counts()
+        b = df["MRI "+var].value_counts()
+        # print(np.asarray(a))
+        # print(np.asarray(b))
+        data = np.stack((a, b),axis=1) #[::-1]
+        print(data)
+        
+        # performing fishers exact test on the data 
+        # if "MRI "+ var == "MRI EMD": continue
+        odd_ratio, p_value = stats.fisher_exact(data, alternative="less") 
+        print('odd ratio is : ' + str(odd_ratio)) 
+        print('p_value is : ' + str(p_value)) 
+
+# print("pre treatment fisher's exact test: ")
+# fishers_exact(df_pre, column_list)
+# print("post treatment fisher's exact test: ")
+# fishers_exact(df_post, column_list) # no EMD
 
 
 
@@ -171,53 +193,68 @@ print(df.columns)
 
 #####################################################################################
 """To draw a Kaplan-Meier Plot based on the current data"""
-# def Kaplan_Meier_plot(df_func):
-#     import matplotlib.pyplot as plt
-#     from sksurv.nonparametric import kaplan_meier_estimator
+def Kaplan_Meier_plot(df_func):
+    import matplotlib.pyplot as plt
+    from sksurv.nonparametric import kaplan_meier_estimator
 
     
-#     df_func = df_func[["P ou R", "PFS"]]
-#     df_func["Event"] = df_func["P ou R"].notna()
-#     print(df_func.head())
-#     x, y, conf_int = kaplan_meier_estimator(df_func["Event"], df_func["PFS"], conf_type="log-log")
+    df_func = df_func[["P ou R", "PFS"]]
+    df_func["Event"] = df_func["P ou R"].notna()
+    print(df_func.head())
+    x, y, conf_int = kaplan_meier_estimator(df_func["Event"], df_func["PFS"], conf_type="log-log")
+    print(x,y)
+
+    # Add censored points to the plot
+    points_x = []
+    points_y = []
+    for e in range(df_func["Event"].count()):
+        if df_func.iloc[e]["Event"]== False:
+            k = df_func.iloc[e]["PFS"]
+            points_x.append(k)
+            index = np.searchsorted(x, k, side='right') -1
+            # print(y[index])
+            points_y.append(y[index])
+    plt.scatter(points_x, points_y, color='plum', marker="+", zorder=5) #label='Points', 
+
     
-#     plt.step(x, y, where="post")
-#     plt.fill_between(x, conf_int[0], conf_int[1], alpha=0.25, step="post")
-#     plt.ylim(0, 1)
-#     plt.title('Kaplan-Meier Plot')
-#     plt.xlabel('PFS(Month)')
-#     plt.ylabel('Percentage')
-#     # plt.legend(loc="best")
-#     plt.show()
-#     # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
-#     return
+    plt.step(x, y, where="post")
+    plt.fill_between(x, conf_int[0], conf_int[1], alpha=0.25, step="post")
+    plt.ylim(bottom=0)
+    plt.xlim(left=0)
+    plt.title('Kaplan-Meier Plot')
+    plt.xlabel('PFS(Month)')
+    plt.ylabel('Percentage')
+    # plt.legend(loc="best")
+    plt.show()
+    # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
+    return
 
-# def Kaplan_Meier_two_plot(df_func):
-#     import matplotlib.pyplot as plt
-#     from sksurv.nonparametric import kaplan_meier_estimator
+def Kaplan_Meier_two_plot(df_func):
+    import matplotlib.pyplot as plt
+    from sksurv.nonparametric import kaplan_meier_estimator
 
-#     df_func["Event"] = df_func["P ou R"].notna()
-#     for treatment_type in ("Pre-CAR-T-CELLS", "Post-CAR-T-CELLS"):
-#         mask_treat = df_func["Stade"] == treatment_type
-#         time_treatment, survival_prob_treatment, conf_int = kaplan_meier_estimator(
-#             df_func["Event"][mask_treat],
-#             df_func["PFS"][mask_treat],
-#             conf_type="log-log",
-#         )
-#         plt.step(time_treatment, survival_prob_treatment, where="post", label=f"Treatment = {treatment_type}")
-#         plt.fill_between(time_treatment, conf_int[0], conf_int[1], alpha=0.25, step="post")
+    df_func["Event"] = df_func["P ou R"].notna()
+    for treatment_type in ("Pre-CAR-T-CELLS", "Post-CAR-T-CELLS"):
+        mask_treat = df_func["Stade"] == treatment_type
+        time_treatment, survival_prob_treatment, conf_int = kaplan_meier_estimator(
+            df_func["Event"][mask_treat],
+            df_func["PFS"][mask_treat],
+            conf_type="log-log",
+        )
+        plt.step(time_treatment, survival_prob_treatment, where="post", label=f"Treatment = {treatment_type}")
+        plt.fill_between(time_treatment, conf_int[0], conf_int[1], alpha=0.25, step="post")
 
-#     plt.ylim(0, 1)
-#     plt.legend(loc="best")
+    plt.ylim(0, 1)
+    plt.legend(loc="best")
     
-#     plt.title('Kaplan-Meier Plot')
-#     plt.xlabel('PFS(Month)')
-#     plt.ylabel('Percentage')
-#     plt.show()
-#     # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
-#     return
+    plt.title('Kaplan-Meier Plot')
+    plt.xlabel('PFS(Month)')
+    plt.ylabel('Percentage')
+    plt.show()
+    # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
+    return
 
-# Kaplan_Meier_plot(df)
+Kaplan_Meier_plot(df_post)
 #################################################################################
 
 
@@ -381,7 +418,7 @@ def RandomForest_model(df_onehot, df_pfs, df_onehot_test):
 
     return
  
-cox_PH_model(df_pre_norm, df_pfs, df_test)
+# cox_PH_model(df_pre_norm, df_pfs, df_test)
 # RandomForest_model(df_pre_norm, df_pfs, df_test)
 
 
