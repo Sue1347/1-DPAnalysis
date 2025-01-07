@@ -4,6 +4,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+
 file_path = "/home/kevin/Downloads/Datasets/DiagProgAnalysis"
 file_name = "simple-dataset-v2.csv"
 
@@ -254,7 +255,7 @@ def Kaplan_Meier_two_plot(df_func):
     # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
     return
 
-Kaplan_Meier_plot(df_post)
+# Kaplan_Meier_plot(df_post)
 #################################################################################
 
 
@@ -266,8 +267,7 @@ from sklearn import set_config
 from sksurv.linear_model import CoxPHSurvivalAnalysis
 from sksurv.ensemble import RandomSurvivalForest
 import matplotlib.pyplot as plt
-
-
+from sklearn.preprocessing import MinMaxScaler
 
 def make_one_hot_data(df_func, column_list):
     """Given some list of characteristics that can eveluate the survival """
@@ -315,19 +315,29 @@ df_pfs = df_pfs[["Event","PFS"]]
 
 cox_column_list = ['Age', 
        'PET Global', 'PET BMI', 'SUVmaxBM', 'PET FL', 'SUVmaxFL',
-       
-       'MRI Global', 'MRI BMI', 'ADCMeanBMI', 'MRI FL',
-       'ADCMeanFL',] 
-# 'PET EMD', 'SUVmaxEMD', 'PET PMD', 'SUVmaxPMD', 
-#  'MRI EMD', 'ADCMean EMD', 'MRI PMD', 'ADCMean PMD'
+       'PET PMD', 'SUVmaxPMD', 
+       'MRI Global', 'MRI BMI', 'ADCMeanBMI', 'MRI FL','ADCMeanFL',
+       'MRI PMD', 'ADCMean PMD',] 
+# 'PET EMD', 'SUVmaxEMD',
+#  'MRI EMD', 'ADCMean EMD',
 # 'Ratio k/l', 'ISS', 'FF BM', 'FF FL', 
 # maybe because of the high values ValueError: LAPACK reported an illegal value in 5-th argument.
 # print(df_pre[cox_column_list].fillna(0).head())
 
 df_pre = df_pre[cox_column_list].fillna(0)
-df_pre_norm = (df_pre-df_pre.min())/(df_pre.max()-df_pre.min())
 
-df_test = df_pre_norm.iloc[5:10]
+# Columns to standardize
+# columns_to_standardize = ["Age", "SUVmaxBM", "SUVmaxFL", 'SUVmaxPMD', "ADCMeanBMI", "ADCMeanFL", 'ADCMean PMD'] # 'SUVmaxEMD','ADCMean EMD',
+# Initialize the StandardScaler
+# scaler = MinMaxScaler()
+# Standardize only the selected columns
+# df_pre[columns_to_standardize] = scaler.fit_transform(df_pre[columns_to_standardize])
+
+df_pre = (df_pre-df_pre.min())/(df_pre.max()-df_pre.min())
+
+# print(df_pre.head()) # it is the same, using minmax scaler from sklearn, or calculate by myself
+
+df_test = df_pre.iloc[5:10]
 
 
 def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
@@ -344,11 +354,11 @@ def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
     estimator = CoxPHSurvivalAnalysis()
     
     estimator.fit(df_onehot, structured_array)
-    print("estimator score",estimator.score(df_onehot, structured_array))
+    print("C-index",estimator.score(df_onehot, structured_array))
 
-    print("Coefficients: \n",pd.Series(estimator.coef_, index=df_onehot.columns))
+    print("Hazard Ratio: \n",pd.Series(np.exp(estimator.coef_), index=df_onehot.columns))
 
-    print("Hazard Ratio: \n",np.exp(estimator.coef_))
+    # print("\n",)
 
     """show what's influence best"""
     n_features = df_onehot.values.shape[1]
@@ -418,7 +428,7 @@ def RandomForest_model(df_onehot, df_pfs, df_onehot_test):
 
     return
  
-# cox_PH_model(df_pre_norm, df_pfs, df_test)
+# cox_PH_model(df_pre, df_pfs, df_test)
 # RandomForest_model(df_pre_norm, df_pfs, df_test)
 
 
