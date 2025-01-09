@@ -9,6 +9,7 @@ from lifelines.statistics import logrank_test
 from sklearn.metrics import roc_auc_score
 from sklearn import set_config
 from sksurv.linear_model import CoxPHSurvivalAnalysis
+from Preprocess_utils import Kaplan_Meier_plot, cox_PH_model
 
 import matplotlib.pyplot as plt
 
@@ -42,7 +43,7 @@ rename_dict = {
 df.rename(columns=rename_dict, inplace=True)
 df["event"] = df["P ou R"].notna()
 
-
+df_ori = df
 df = df.fillna(0.0001)
 # Create structured array for survival data
 survival_data = Surv.from_dataframe(event="event", time="PFS", data=df)
@@ -115,6 +116,7 @@ for var in var_list:
     # plot_roc_curve(fpr, tpr, auc_score, optimal_idx)
 
     df[var+"_thrshd"] = df[var]>=optimal_threshold
+    df_ori[var+"_thrshd"] = df_ori[var]>=optimal_threshold
 
     T1 = df.loc[(df[var] >= optimal_threshold),"PFS"]
     T2 = df.loc[(df[var] < optimal_threshold),"PFS"]
@@ -148,57 +150,45 @@ df_pre = df[cox_column_list].fillna(0)
 
 df_test = df_pre.iloc[5:10]
 
+# cox_PH_model(df_pre, df_pfs, df_test)
 
-def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
+"""depend on thresholds to draw kaplan meier"""
+def Kaplan_Meier_two_plot(df_func, thrshd):
+    import matplotlib.pyplot as plt
+    from sksurv.nonparametric import kaplan_meier_estimator
 
-    set_config(display="text")  # displays text representation of estimators
-    
-    # Define the structured dtype
-    dtype = [('Status', '?'), ('Survival_in_days', '<f8')]  # '?' for boolean, '<f8' for float
+    df_func["Event"] = df_func["P ou R"].notna()
+    for treatment_type in (True, False):
+        mask_treat = df_func[thrshd] == treatment_type
+        x, y, conf_int = kaplan_meier_estimator(
+            df_func["Event"][mask_treat],
+            df_func["PFS"][mask_treat],
+            conf_type="log-log",
+        )
+        plt.step(x, y, where="post", label=f"Larger than {thrshd} is {treatment_type}")
+        plt.fill_between(x, conf_int[0], conf_int[1], alpha=0.25, step="post")
 
-    # Convert DataFrame to structured array
-    structured_array = np.array(list(df_pfs.itertuples(index=False, name=None)), dtype=dtype)
-    # print(structured_array)
+        # Add censored points to the plot
+        points_x = []
+        points_y = []
+        for e in range(df_func["Event"].count()):
+            if df_func.iloc[e]["Event"]== False and df_func.iloc[e][thrshd]==treatment_type:
+                k = df_func.iloc[e]["PFS"]
+                points_x.append(k)
+                index = np.searchsorted(x, k, side='right') -1
+                # print(y[index])
+                points_y.append(y[index])
+        plt.scatter(points_x, points_y, color='plum', marker="+", zorder=5) #label='Points', 
 
-    estimator = CoxPHSurvivalAnalysis()
-    
-    estimator.fit(df_onehot, structured_array)
-    print("estimator score",estimator.score(df_onehot, structured_array))
-
-    print("Coefficients: \n",pd.Series(estimator.coef_, index=df_onehot.columns))
-
-    print("Hazard Ratio: \n",np.exp(estimator.coef_))
-
-    """show what's influence best"""
-    n_features = df_onehot.values.shape[1]
-    scores = np.empty(n_features)
-    m = CoxPHSurvivalAnalysis()
-    for j in range(n_features):
-        Xj = df_onehot.values[:, j : j + 1]
-        m.fit(Xj, structured_array)
-        scores[j] = m.score(Xj, structured_array)
-
-    print("scores: \n",pd.Series(scores, index=df_onehot.columns).sort_values(ascending=False))
-
-    """make a test""" 
-    # Find columns in B but not in A
-    missing_columns = set(df_onehot.columns) - set(df_onehot_test.columns)
-    # Add missing columns to A with value 0
-    for col in missing_columns:
-        df_onehot_test[col] = 0
-    # Ensure column order matches B
-    df_onehot_test = df_onehot_test[df_onehot.columns]
-
-    pred_surv = estimator.predict_survival_function(df_onehot_test)
-
-    time_points = np.arange(1, 41)
-    for i, surv_func in enumerate(pred_surv):
-        plt.step(time_points, surv_func(time_points), where="post", label=f"Sample {i + 1}")
-    plt.ylabel(r"probability of survival") # $\hat{S}(t)$
-    plt.xlabel("time $t$")
+    plt.ylim(bottom=0)
+    plt.xlim(left=0)
     plt.legend(loc="best")
-    plt.show()
     
-    return 
+    plt.title('Kaplan-Meier Plot')
+    plt.xlabel('PFS(Month)')
+    plt.ylabel('Percentage')
+    plt.show()
+    # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
+    return
 
-cox_PH_model(df_pre, df_pfs, df_test)
+Kaplan_Meier_two_plot(df_ori, 'SUVmaxEMD_thrshd') # 'Age_thrshd', 'SUVmaxBM_thrshd','SUVmaxFL_thrshd','SUVmaxEMD_thrshd',
