@@ -313,13 +313,13 @@ df_pfs = df_pre[["PFS"]].astype(float)
 df_pfs["Event"] = df_pre["P ou R"].notna().astype(int)
 df_pfs = df_pfs[["Event","PFS"]]
 
-cox_column_list = ['Age', 
-       'PET Global', 'PET BMI', 'SUVmaxBM', 'PET FL', 'SUVmaxFL',
-       'PET PMD', 'SUVmaxPMD', 
-       'MRI Global', 'MRI BMI', 'ADCMeanBMI', 'MRI FL','ADCMeanFL',
-       'MRI PMD', 'ADCMean PMD',] 
-# 'PET EMD', 'SUVmaxEMD',
-#  'MRI EMD', 'ADCMean EMD',
+cox_column_list = [
+       'PET Global', 'PET BMI',  'PET FL', 'SUVmaxFL',
+        
+       'MRI Global',  'ADCMeanBMI', 'MRI FL','ADCMeanFL',
+       ] # 'Age', 'SUVmaxBM','MRI BMI',
+# 'PET EMD', 'SUVmaxEMD', 'PET PMD', 'SUVmaxPMD',
+#  'MRI EMD', 'ADCMean EMD', 'MRI PMD', 'ADCMean PMD',
 # 'Ratio k/l', 'ISS', 'FF BM', 'FF FL', 
 # maybe because of the high values ValueError: LAPACK reported an illegal value in 5-th argument.
 # print(df_pre[cox_column_list].fillna(0).head())
@@ -428,7 +428,7 @@ def RandomForest_model(df_onehot, df_pfs, df_onehot_test):
 
     return
  
-# cox_PH_model(df_pre, df_pfs, df_test)
+cox_PH_model(df_pre, df_pfs, df_test)
 # RandomForest_model(df_pre_norm, df_pfs, df_test)
 
 
