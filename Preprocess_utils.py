@@ -3,6 +3,13 @@ import os
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from lifelines import CoxPHFitter
+from lifelines.datasets import load_rossi
+
+
+
+
+
 
 
 file_path = "/home/kevin/Downloads/Datasets/DiagProgAnalysis"
@@ -313,18 +320,24 @@ df_pfs = df_pre[["PFS"]].astype(float)
 df_pfs["Event"] = df_pre["P ou R"].notna().astype(int)
 df_pfs = df_pfs[["Event","PFS"]]
 
-cox_column_list = [
-       'PET Global', 'PET BMI',  'PET FL', 'SUVmaxFL',
+cox_column_list = [ 'PET Global','PET BMI','SUVmaxBM','SUVmaxFL', 'MRI FL',
         
-       'MRI Global',  'ADCMeanBMI', 'MRI FL','ADCMeanFL',
-       ] # 'Age', 'SUVmaxBM','MRI BMI',
-# 'PET EMD', 'SUVmaxEMD', 'PET PMD', 'SUVmaxPMD',
-#  'MRI EMD', 'ADCMean EMD', 'MRI PMD', 'ADCMean PMD',
-# 'Ratio k/l', 'ISS', 'FF BM', 'FF FL', 
+        # 'PET Global','SUVmaxFL', 'PET BMI', 'SUVmaxBM',   
+        # 'MRI Global', 'MRI FL', 'ADCMeanFL', 'MRI BMI', 
+           
+       ] # 'Age', 'PET FL', 'ADCMeanBMI',
+# 'PET PMD', 'SUVmaxPMD', 'PET EMD',  'SUVmaxEMD', 
+# 'MRI PMD', 'ADCMean PMD',  'MRI EMD', 'ADCMean EMD', 
+#  'Ratio k/l','ISS', 'FF FL', 'FF BM',
 # maybe because of the high values ValueError: LAPACK reported an illegal value in 5-th argument.
 # print(df_pre[cox_column_list].fillna(0).head())
 
 df_pre = df_pre[cox_column_list].fillna(0)
+
+cph = CoxPHFitter()
+cph.fit(pd.concat([df_pfs,df_pre],axis=1), duration_col='PFS', event_col='Event')
+
+cph.print_summary()  # access the individual results using cph.summary
 
 # Columns to standardize
 # columns_to_standardize = ["Age", "SUVmaxBM", "SUVmaxFL", 'SUVmaxPMD', "ADCMeanBMI", "ADCMeanFL", 'ADCMean PMD'] # 'SUVmaxEMD','ADCMean EMD',
