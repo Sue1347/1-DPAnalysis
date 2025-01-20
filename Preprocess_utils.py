@@ -320,38 +320,57 @@ df_pfs = df_pre[["PFS"]].astype(float)
 df_pfs["Event"] = df_pre["P ou R"].notna().astype(int)
 df_pfs = df_pfs[["Event","PFS"]]
 
-cox_column_list = [ 'PET Global','PET BMI','SUVmaxBM','SUVmaxFL', 'MRI FL',
-        
-        # 'PET Global','SUVmaxFL', 'PET BMI', 'SUVmaxBM',   
-        # 'MRI Global', 'MRI FL', 'ADCMeanFL', 'MRI BMI', 
-           
-       ] # 'Age', 'PET FL', 'ADCMeanBMI',
-# 'PET PMD', 'SUVmaxPMD', 'PET EMD',  'SUVmaxEMD', 
-# 'MRI PMD', 'ADCMean PMD',  'MRI EMD', 'ADCMean EMD', 
+cox_column_list = [ 'PET BMI','SUVmaxBM','SUVmaxFL',# 'PET Global', 'MRI FL', 
+        # 'PET BMI', 'SUVmaxBM','SUVmaxFL', # 'PET EMD',
+        # 'PET Global','PET BMI', 'SUVmaxBM',  'PET FL','SUVmaxFL', 'PET EMD', 'PET PMD', 
+        # 'MRI Global',  'MRI BMI', 'ADCMeanBMI', 'MRI FL', 'ADCMeanFL', 'MRI EMD', 'MRI PMD',
+        # 'PET Number FLs', 'PET Number PMD', 'MRI Number FLs', 'MRI Number PMD',  
+       ] # 'Age',  
+#  'SUVmaxPMD',   'SUVmaxEMD', 
+#  'ADCMean PMD',   'ADCMean EMD', 
 #  'Ratio k/l','ISS', 'FF FL', 'FF BM',
 # maybe because of the high values ValueError: LAPACK reported an illegal value in 5-th argument.
 # print(df_pre[cox_column_list].fillna(0).head())
 
-df_pre = df_pre[cox_column_list].fillna(0)
+"""for univariable in cox_column_list:"""
+# for univariable in cox_column_list:
+#     # print(df_pre[univariable].value_counts())
+#     value_map = {
+#         '1': '1',
+#         '2': '2',
+#         '3': '3',
+#         '4': '4',
+#         '5': '5',
+#         '5_10': '7.5',
+#         '>10': '10'
+#     }
+#     # df_pre[univariable+"_temp"] = df_pre[univariable].map(value_map)
+#     # df_pre_sub = pd.concat([df_pfs,df_pre[univariable+"_temp"]],axis=1).dropna()
+
+#     # df_pre_sub = df_pre[univariable].fillna(0)
+
+#     df_pre_sub =  pd.concat([df_pfs,df_pre[univariable]],axis=1).dropna()
+
+#     cph = CoxPHFitter()
+#     cph.fit(df_pre_sub, duration_col='PFS', event_col='Event')
+
+#     cph.print_summary()  # access the individual results using cph.summary
+
+###### for multi-variate models
+# df_pre = df_pre[cox_column_list].fillna(0)
+df_pre = df_pre[cox_column_list]#.fillna(0)
+df_pre_sub = pd.concat([df_pfs,df_pre],axis=1).dropna()
 
 cph = CoxPHFitter()
-cph.fit(pd.concat([df_pfs,df_pre],axis=1), duration_col='PFS', event_col='Event')
+# cph.fit(pd.concat([df_pfs,df_pre],axis=1), duration_col='PFS', event_col='Event')
+cph.fit(df_pre_sub, duration_col='PFS', event_col='Event')
 
 cph.print_summary()  # access the individual results using cph.summary
 
-# Columns to standardize
-# columns_to_standardize = ["Age", "SUVmaxBM", "SUVmaxFL", 'SUVmaxPMD', "ADCMeanBMI", "ADCMeanFL", 'ADCMean PMD'] # 'SUVmaxEMD','ADCMean EMD',
-# Initialize the StandardScaler
-# scaler = MinMaxScaler()
-# Standardize only the selected columns
-# df_pre[columns_to_standardize] = scaler.fit_transform(df_pre[columns_to_standardize])
-
-df_pre = (df_pre-df_pre.min())/(df_pre.max()-df_pre.min())
-
-# print(df_pre.head()) # it is the same, using minmax scaler from sklearn, or calculate by myself
+###### standardize the values
+# df_pre = (df_pre-df_pre.min())/(df_pre.max()-df_pre.min())
 
 df_test = df_pre.iloc[5:10]
-
 
 def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
 
@@ -382,26 +401,26 @@ def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
         m.fit(Xj, structured_array)
         scores[j] = m.score(Xj, structured_array)
 
-    print("scores: \n",pd.Series(scores, index=df_onehot.columns).sort_values(ascending=False))
+    print("scores: \n",pd.Series(scores, index=df_onehot.columns)) # .sort_values(ascending=False)
 
     """make a test""" 
-    # Find columns in B but not in A
-    missing_columns = set(df_onehot.columns) - set(df_onehot_test.columns)
-    # Add missing columns to A with value 0
-    for col in missing_columns:
-        df_onehot_test[col] = 0
-    # Ensure column order matches B
-    df_onehot_test = df_onehot_test[df_onehot.columns]
+    # # Find columns in B but not in A
+    # missing_columns = set(df_onehot.columns) - set(df_onehot_test.columns)
+    # # Add missing columns to A with value 0
+    # for col in missing_columns:
+    #     df_onehot_test[col] = 0
+    # # Ensure column order matches B
+    # df_onehot_test = df_onehot_test[df_onehot.columns]
 
-    pred_surv = estimator.predict_survival_function(df_onehot_test)
+    # pred_surv = estimator.predict_survival_function(df_onehot_test)
 
-    time_points = np.arange(1, 41)
-    for i, surv_func in enumerate(pred_surv):
-        plt.step(time_points, surv_func(time_points), where="post", label=f"Sample {i + 1}")
-    plt.ylabel(r"probability of survival") # $\hat{S}(t)$
-    plt.xlabel("time $t$")
-    plt.legend(loc="best")
-    plt.show()
+    # time_points = np.arange(1, 41)
+    # for i, surv_func in enumerate(pred_surv):
+    #     plt.step(time_points, surv_func(time_points), where="post", label=f"Sample {i + 1}")
+    # plt.ylabel(r"probability of survival") # $\hat{S}(t)$
+    # plt.xlabel("time $t$")
+    # plt.legend(loc="best")
+    # plt.show()
     
     return 
 
@@ -441,7 +460,7 @@ def RandomForest_model(df_onehot, df_pfs, df_onehot_test):
 
     return
  
-cox_PH_model(df_pre, df_pfs, df_test)
+# cox_PH_model(df_pre, df_pfs, df_test)
 # RandomForest_model(df_pre_norm, df_pfs, df_test)
 
 
