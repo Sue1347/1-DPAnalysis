@@ -358,19 +358,19 @@ cox_column_list = [ 'PET BMI','SUVmaxBM','SUVmaxFL',# 'PET Global', 'MRI FL',
 
 ###### for multi-variate models
 # df_pre = df_pre[cox_column_list].fillna(0)
-df_pre = df_pre[cox_column_list]#.fillna(0)
-df_pre_sub = pd.concat([df_pfs,df_pre],axis=1).dropna()
+# df_pre = df_pre[cox_column_list]#.fillna(0)
+# df_pre_sub = pd.concat([df_pfs,df_pre],axis=1).dropna()
 
-cph = CoxPHFitter()
-# cph.fit(pd.concat([df_pfs,df_pre],axis=1), duration_col='PFS', event_col='Event')
-cph.fit(df_pre_sub, duration_col='PFS', event_col='Event')
+# cph = CoxPHFitter()
+# # cph.fit(pd.concat([df_pfs,df_pre],axis=1), duration_col='PFS', event_col='Event')
+# cph.fit(df_pre_sub, duration_col='PFS', event_col='Event')
 
-cph.print_summary()  # access the individual results using cph.summary
+# cph.print_summary()  # access the individual results using cph.summary
 
-###### standardize the values
-# df_pre = (df_pre-df_pre.min())/(df_pre.max()-df_pre.min())
+# ###### standardize the values
+# # df_pre = (df_pre-df_pre.min())/(df_pre.max()-df_pre.min())
 
-df_test = df_pre.iloc[5:10]
+# df_test = df_pre.iloc[5:10]
 
 def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
 
@@ -464,8 +464,34 @@ def RandomForest_model(df_onehot, df_pfs, df_onehot_test):
 # RandomForest_model(df_pre_norm, df_pfs, df_test)
 
 
-"""save it to csv files"""
-# print(res)
-# save_tables_cox = "tables_cox.csv"
-# np.savetxt(os.path.join(file_path,save_tables_cox), res, delimiter=',')
+"""Comparison between pre and post"""
+compa_elements = [
+    "PET Global", "PET BMI", "PET FL", "PET EMD", "PET PMD",
+    "MRI Global", "MRI BMI", "MRI FL", "MRI EMD", "MRI PMD",
+    ]
 
+
+
+# Find common keys based on both 'nom' and 'prenom'
+common_keys = pd.merge(df_pre[['NOM', 'Prenom']], df_post[['NOM', 'Prenom']], on=['NOM', 'Prenom'])
+
+# Count the number of common keys
+num_common_keys = len(common_keys)
+print(f"Number of common key pairs: {num_common_keys}")
+
+# Merge the DataFrames on common keys, including all columns
+merged_df = pd.merge(df_pre, df_post, on=['NOM', 'Prenom'], suffixes=(' pre', ' post'))
+
+# Final DataFrame with all requested columns
+# print(merged_df.head())
+
+# get all the comparison: 00: 0; 01: 1, 10: 2, 11: 3
+for element in compa_elements:
+    # Apply the logic to create column 'C'
+    merged_df[element+' comp'] = merged_df.apply(
+        lambda row: 3 if row[element+' pre'] == row[element+' post'] and row[element+' pre'] == 1 else
+                    0 if row[element+' pre'] == row[element+' post'] and row[element+' pre'] == 0 else
+                    1 if row[element+' pre'] != row[element+' post'] and row[element+' pre'] == 0 else
+                    2,
+        axis=1)
+    print(merged_df[element+' comp'].value_counts(sort=False))
