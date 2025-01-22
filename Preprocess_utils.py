@@ -115,6 +115,10 @@ print(df["ADCMeanBMI"].mean(),df["ADCMeanBMI"].std())
 df_pre = df[df["Stade"]=="Pre-CAR-T-CELLS"]
 df_post = df[df["Stade"]=="Post-CAR-T-CELLS"]
 
+print(df_post["Reponse"].value_counts())
+df_post_CR = df_post[df_post["Reponse"]=="CR"]
+df_post_0 = df_post[df_post["Reponse"]=="0"]
+
 print(df.columns)
 
 # continuous_list = ['Age', 'Ratio k/l', 'PFS', 'OS', 'ISS',
@@ -237,24 +241,38 @@ def Kaplan_Meier_plot(df_func):
     # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
     return
 
-def Kaplan_Meier_two_plot(df_func):
+def Kaplan_Meier_two_plot(df_funcs):
     import matplotlib.pyplot as plt
     from sksurv.nonparametric import kaplan_meier_estimator
 
-    df_func["Event"] = df_func["P ou R"].notna()
-    for treatment_type in ("Pre-CAR-T-CELLS", "Post-CAR-T-CELLS"):
-        mask_treat = df_func["Stade"] == treatment_type
+    key_words = ["CR", "0"]
+    colors = ["navy", "maroon"]
+    for df_func,key_word,color in zip(df_funcs,key_words,colors):
+        df_func["Event"] = df_func["P ou R"].notna()
+        # mask_treat = df_func["Stade"] == treatment_type
         time_treatment, survival_prob_treatment, conf_int = kaplan_meier_estimator(
-            df_func["Event"][mask_treat],
-            df_func["PFS"][mask_treat],
+            df_func["Event"], # [mask_treat]
+            df_func["PFS"], # [mask_treat]
             conf_type="log-log",
         )
-        plt.step(time_treatment, survival_prob_treatment, where="post", label=f"Treatment = {treatment_type}")
+        # Add censored points to the plot
+        points_x = []
+        points_y = []
+        for e in range(df_func["Event"].count()):
+            if df_func.iloc[e]["Event"]== False:
+                k = df_func.iloc[e]["PFS"]
+                points_x.append(k)
+                index = np.searchsorted(time_treatment, k, side='right') -1
+                # print(y[index])
+                points_y.append(survival_prob_treatment[index])
+        plt.scatter(points_x, points_y, color=color, marker="+", zorder=5) #label='Points', plum
+        plt.step(time_treatment, survival_prob_treatment, where="post", label=f"Patient group: {key_word}")
         plt.fill_between(time_treatment, conf_int[0], conf_int[1], alpha=0.25, step="post")
 
-    plt.ylim(0, 1)
-    plt.legend(loc="best")
     
+    plt.legend(loc="best")
+    plt.ylim(bottom=0)
+    plt.xlim(left=0)
     plt.title('Kaplan-Meier Plot')
     plt.xlabel('PFS(Month)')
     plt.ylabel('Percentage')
@@ -262,7 +280,9 @@ def Kaplan_Meier_two_plot(df_func):
     # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
     return
 
-# Kaplan_Meier_plot(df_post)
+# Kaplan_Meier_plot(df_post_CR)
+# Kaplan_Meier_plot(df_post_0)
+# Kaplan_Meier_two_plot([df_post_CR,df_post_0])
 #################################################################################
 
 
@@ -320,10 +340,10 @@ df_pfs = df_pre[["PFS"]].astype(float)
 df_pfs["Event"] = df_pre["P ou R"].notna().astype(int)
 df_pfs = df_pfs[["Event","PFS"]]
 
-cox_column_list = [ 'PET BMI','SUVmaxBM','SUVmaxFL',# 'PET Global', 'MRI FL', 
+cox_column_list = [ #'PET BMI','SUVmaxBM','SUVmaxFL',# 'PET Global', 'MRI FL', 
         # 'PET BMI', 'SUVmaxBM','SUVmaxFL', # 'PET EMD',
-        # 'PET Global','PET BMI', 'SUVmaxBM',  'PET FL','SUVmaxFL', 'PET EMD', 'PET PMD', 
-        # 'MRI Global',  'MRI BMI', 'ADCMeanBMI', 'MRI FL', 'ADCMeanFL', 'MRI EMD', 'MRI PMD',
+        'PET Global', 'PET BMI', 'SUVmaxBM', 'PET FL', 'SUVmaxFL', 'PET EMD', 'PET PMD',
+        'MRI Global', 'MRI BMI', 'ADCMeanBMI', 'MRI FL', 'ADCMeanFL', 'MRI EMD', 'MRI PMD',
         # 'PET Number FLs', 'PET Number PMD', 'MRI Number FLs', 'MRI Number PMD',  
        ] # 'Age',  
 #  'SUVmaxPMD',   'SUVmaxEMD', 
@@ -333,28 +353,41 @@ cox_column_list = [ 'PET BMI','SUVmaxBM','SUVmaxFL',# 'PET Global', 'MRI FL',
 # print(df_pre[cox_column_list].fillna(0).head())
 
 """for univariable in cox_column_list:"""
-# for univariable in cox_column_list:
-#     # print(df_pre[univariable].value_counts())
-#     value_map = {
-#         '1': '1',
-#         '2': '2',
-#         '3': '3',
-#         '4': '4',
-#         '5': '5',
-#         '5_10': '7.5',
-#         '>10': '10'
-#     }
-#     # df_pre[univariable+"_temp"] = df_pre[univariable].map(value_map)
-#     # df_pre_sub = pd.concat([df_pfs,df_pre[univariable+"_temp"]],axis=1).dropna()
+def univ_cox(cox_column_list, df_func):
+    df_pfs = df_func[["PFS"]].astype(float)
+    df_pfs["Event"] = df_func["P ou R"].notna().astype(int)
+    df_pfs = df_pfs[["Event","PFS"]]
+    for univariable in cox_column_list:
+    # print(df_pre[univariable].value_counts())
+        value_map = {
+            '1': '1',
+            '2': '2',
+            '3': '3',
+            '4': '4',
+            '5': '5',
+            '5_10': '7.5',
+            '>10': '10'
+        }
+        # df_pre[univariable+"_temp"] = df_pre[univariable].map(value_map)
+        # df_pre_sub = pd.concat([df_pfs,df_pre[univariable+"_temp"]],axis=1).dropna()
 
-#     # df_pre_sub = df_pre[univariable].fillna(0)
+        # df_pre_sub = df_pre[univariable].fillna(0)
 
-#     df_pre_sub =  pd.concat([df_pfs,df_pre[univariable]],axis=1).dropna()
+        df_func_sub =  pd.concat([df_pfs,df_func[univariable]],axis=1).dropna()
 
-#     cph = CoxPHFitter()
-#     cph.fit(df_pre_sub, duration_col='PFS', event_col='Event')
+        cph = CoxPHFitter()
+        cph.fit(df_func_sub, duration_col='PFS', event_col='Event')
 
-#     cph.print_summary()  # access the individual results using cph.summary
+        cph.print_summary()  # access the individual results using cph.summary
+
+# for pre treatment:
+# univ_cox(cox_column_list, df_pre, df_pfs)
+
+# for post treatment:
+# print("This is for the Complete response patients: ")
+# univ_cox(cox_column_list, df_post_CR) # only few columns can be calculated
+# print("This is for the start with negative patients: ")
+# univ_cox(cox_column_list, df_post_0) # only fewer columns can be calculated
 
 ###### for multi-variate models
 # df_pre = df_pre[cox_column_list].fillna(0)
@@ -462,8 +495,10 @@ def RandomForest_model(df_onehot, df_pfs, df_onehot_test):
  
 # cox_PH_model(df_pre, df_pfs, df_test)
 # RandomForest_model(df_pre_norm, df_pfs, df_test)
+###############################################################
 
 
+############################################################
 """Comparison between pre and post"""
 compa_elements = [
     "PET Global", "PET BMI", "PET FL", "PET EMD", "PET PMD",
@@ -485,7 +520,7 @@ merged_df = pd.merge(df_pre, df_post, on=['NOM', 'Prenom'], suffixes=(' pre', ' 
 # Final DataFrame with all requested columns
 # print(merged_df.head())
 
-# get all the comparison: 00: 0; 01: 1, 10: 2, 11: 3
+""" get all the comparison: 00: 0; 01: 1, 10: 2, 11: 3"""
 for element in compa_elements:
     # Apply the logic to create column 'C'
     merged_df[element+' comp'] = merged_df.apply(
@@ -494,4 +529,14 @@ for element in compa_elements:
                     1 if row[element+' pre'] != row[element+' post'] and row[element+' pre'] == 0 else
                     2,
         axis=1)
-    print(merged_df[element+' comp'].value_counts(sort=False))
+    # print(merged_df[element+' comp'].value_counts(sort=False))
+
+from scipy.stats import chi2_contingency
+for element in ["Global","BMI", "FL", "EMD", "PMD"]:
+    contingency_table = pd.crosstab(merged_df['PET '+element+' comp'], merged_df['MRI '+element+' comp'])
+    print(contingency_table,"\n")
+    chi2, p, dof, expected = chi2_contingency(contingency_table)
+
+    print(f"{element}: Chi-squared statistic: {chi2}")
+    print(f"P-value: {p}")
+    
