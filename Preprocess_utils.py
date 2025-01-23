@@ -531,12 +531,18 @@ for element in compa_elements:
         axis=1)
     # print(merged_df[element+' comp'].value_counts(sort=False))
 
-from scipy.stats import chi2_contingency
-for element in ["Global","BMI", "FL", "EMD", "PMD"]:
-    contingency_table = pd.crosstab(merged_df['PET '+element+' comp'], merged_df['MRI '+element+' comp'])
-    print(contingency_table,"\n")
-    chi2, p, dof, expected = chi2_contingency(contingency_table)
+# from scipy.stats import chi2_contingency
+# for element in ["Global","BMI", "FL", "EMD", "PMD"]:
+#     contingency_table = pd.crosstab(merged_df['PET '+element+' comp'], merged_df['MRI '+element+' comp'])
+#     print(contingency_table,"\n")
+#     chi2, p, dof, expected = chi2_contingency(contingency_table)
 
-    print(f"{element}: Chi-squared statistic: {chi2}")
-    print(f"P-value: {p}")
-    
+#     print(f"{element}: Chi-squared statistic: {chi2}")
+#     print(f"P-value: {p}")
+
+
+patient_df = merged_df[merged_df["PET Global comp"]== 3]
+print(patient_df)
+
+patient_df = merged_df[merged_df["MRI Global comp"]== 3]
+print(patient_df)
