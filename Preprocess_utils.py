@@ -98,6 +98,10 @@ df = read_my_csv(os.path.join(file_path,file_name))
 mri_idx = df.columns.get_loc('MRI global')
 
 df.rename(columns=rename_dict, inplace=True)
+# clean the Nan data: 
+df = df[df["PET Global"].notna()]
+
+
 # print(df["Ig"].value_counts(normalize=True))
 print("SUVmaxBM: ",df["SUVmaxBM"].mean(),df["SUVmaxBM"].std())
 # print(df["SUVmaxBM"])
@@ -118,8 +122,10 @@ df_post = df[df["Stade"]=="Post-CAR-T-CELLS"]
 print(df_post["Reponse"].value_counts())
 df_post_CR = df_post[df_post["Reponse"]=="CR"]
 df_post_0 = df_post[df_post["Reponse"]=="0"]
+df_post_nonCR = df_post[~df_post["Reponse"].isin(["0", "CR"])]
 
-print(df.columns)
+# print(df.columns)
+# print(df_post_nonCR)
 
 # continuous_list = ['Age', 'Ratio k/l', 'PFS', 'OS', 'ISS',
 #         'SUVmaxBM',  'SUVmaxFL', 'SUVmaxEMD', 'SUVmaxPMD', 
@@ -245,8 +251,8 @@ def Kaplan_Meier_two_plot(df_funcs):
     import matplotlib.pyplot as plt
     from sksurv.nonparametric import kaplan_meier_estimator
 
-    key_words = ["CR", "0"]
-    colors = ["navy", "maroon"]
+    key_words = ["CR", "0", "NonCR"]
+    colors = ["navy", "maroon", "darkgreen"]
     for df_func,key_word,color in zip(df_funcs,key_words,colors):
         df_func["Event"] = df_func["P ou R"].notna()
         # mask_treat = df_func["Stade"] == treatment_type
@@ -282,7 +288,7 @@ def Kaplan_Meier_two_plot(df_funcs):
 
 # Kaplan_Meier_plot(df_post_CR)
 # Kaplan_Meier_plot(df_post_0)
-# Kaplan_Meier_two_plot([df_post_CR,df_post_0])
+# Kaplan_Meier_two_plot([df_post_CR,df_post_0,df_post_nonCR])
 #################################################################################
 
 
@@ -517,6 +523,7 @@ print(f"Number of common key pairs: {num_common_keys}")
 # Merge the DataFrames on common keys, including all columns
 merged_df = pd.merge(df_pre, df_post, on=['NOM', 'Prenom'], suffixes=(' pre', ' post'))
 
+
 # Final DataFrame with all requested columns
 # print(merged_df.head())
 
@@ -541,8 +548,11 @@ for element in compa_elements:
 #     print(f"P-value: {p}")
 
 
+"""get all the description infomation"""
+
 patient_df = merged_df[merged_df["PET Global comp"]== 3]
-print(patient_df)
+# print(patient_df.columns[10:20])
+print(patient_df[[ "PET BMI post", "PET FL post", "PET EMD post", "PET PMD post"]])
 
 patient_df = merged_df[merged_df["MRI Global comp"]== 3]
-print(patient_df)
+print(patient_df[[ "MRI BMI post", "MRI FL post", "MRI EMD post", "MRI PMD post"]])
