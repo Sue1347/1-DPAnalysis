@@ -8,32 +8,9 @@ from lifelines.datasets import load_rossi
 
 
 
-
-
-
-
 file_path = "/home/kevin/Downloads/Datasets/DiagProgAnalysis"
-file_name = "simple-dataset-v2.csv"
+file_name = "simple-dataset-SMM-clean.csv" #"simple-dataset-v2.csv"
 
-def read_my_csv(file_path):
-    """
-    Reads CSV file.
-    """
-    # Read the CSV file into a DataFrame
-    df = pd.read_csv(file_path)
-    return df
-
-def rename_columns_by_index(df, new_names):
-    """
-    Renames the columns of a DataFrame using their positional indices.
-    ...I really like this exmaples so I leave it here in case I want to learn...
-    """
-    # Convert column indices to names and create a rename map
-    rename_dict = {df.columns[idx]: new_name for idx, new_name in new_names.items()}
-    
-    # Rename columns
-    df.rename(columns=rename_dict, inplace=True)
-    return df
 
 def make_diagnosis_tables(df_func, column_list):
     """
@@ -94,7 +71,7 @@ diagnosis_elements = [
 column_list = ["Global","FL", "BMI", "EMD", "PMD"] #
 
 
-df = read_my_csv(os.path.join(file_path,file_name))
+df = pd.read_csv(os.path.join(file_path,file_name))
 mri_idx = df.columns.get_loc('MRI global')
 
 df.rename(columns=rename_dict, inplace=True)
@@ -286,7 +263,7 @@ def Kaplan_Meier_two_plot(df_funcs):
     # plt.savefig(os.path.join(file_path,"Kaplan-Meier-all.png")) #? why
     return
 
-# Kaplan_Meier_plot(df_post_CR)
+# Kaplan_Meier_plot(df)
 # Kaplan_Meier_plot(df_post_0)
 # Kaplan_Meier_two_plot([df_post_CR,df_post_0,df_post_nonCR])
 #################################################################################
@@ -464,7 +441,7 @@ def cox_PH_model(df_onehot, df_pfs, df_onehot_test):
     return 
 
 def RandomForest_model(df_onehot, df_pfs, df_onehot_test):
-    dtype = [('Status', '?'), ('Survival_in_days', '<f8')]  # '?' for boolean, '<f8' for float
+    dtype = [('Status', '?'), ('Survival_in_months', '<f8')]  # '?' for boolean, '<f8' for float
 
     # Convert DataFrame to structured array
     structured_array = np.array(list(df_pfs.itertuples(index=False, name=None)), dtype=dtype)

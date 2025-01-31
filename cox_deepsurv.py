@@ -1,4 +1,8 @@
 # Simply used the pycox notebook for reference
+# 巧妇难为无米之炊
+
+# with 70 as training data, with 5 variate I can not even set a [8,8,1] MLP network
+# because it has 129 parameters to calculate
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,76 +25,62 @@ _ = torch.manual_seed(123)
 """the basic data of the dataset"""
 
 file_path = "/home/kevin/Downloads/Datasets/DiagProgAnalysis"
-file_name = "simple-dataset-v2.csv"
-
-def rename_columns_by_index(df, new_names):
-    """
-    Renames the columns of a DataFrame using their positional indices.
-    ...I really like this exmaples so I leave it here in case I want to learn...
-    """
-    # Convert column indices to names and create a rename map
-    rename_dict = {df.columns[idx]: new_name for idx, new_name in new_names.items()}
-    
-    # Rename columns
-    df.rename(columns=rename_dict, inplace=True)
-    return df
-rename_dict = {
-    "TEP Global": "PET Global",
-    "MRI global": "MRI Global",
-    "BMI": "PET BMI",
-    "FL": "PET FL",
-    "Number FLs": "PET Number FLs",
-    "EMD": "PET EMD",
-    "Number EMD": "PET Number EMD",
-    "PMD": "PET PMD",
-    "Number PMD": "PET Number PMD",
-    "BMI.1": "MRI BMI",
-    "FL.1": "MRI FL",
-    "Number FLs.1": "MRI Number FLs",
-    "EMD.1": "MRI EMD",
-    "Number EMD.1": "MRI Number EMD",
-    "PMD.1": "MRI PMD",
-    "Number PMD.1": "MRI Number PMD",
-}
+file_name = "simple-dataset-SMM-clean.csv"
 
 df = pd.read_csv(os.path.join(file_path,file_name))
-df.rename(columns=rename_dict, inplace=True)
 
 print(df.columns)
 print("SUVmaxBM: ",df["SUVmaxBM"].mean(),df["SUVmaxBM"].std())
 
+# df_train = metabric.read_df()
+# df_test = df_train.sample(frac=0.2)
+# df_train = df_train.drop(df_test.index)
+# df_val = df_train.sample(frac=0.2)
+# df_train = df_train.drop(df_val.index)
+
+# cols_standardize = ['x0', 'x1', 'x2', 'x3', 'x8']
+# cols_leave = ['x4', 'x5', 'x6', 'x7']
+
+# standardize = [([col], StandardScaler()) for col in cols_standardize]
+# leave = [(col, None) for col in cols_leave]
+
+# x_mapper = DataFrameMapper(standardize + leave)
+
+# x_train = x_mapper.fit_transform(df_train).astype('float32')
+# x_val = x_mapper.transform(df_val).astype('float32')
+# x_test = x_mapper.transform(df_test).astype('float32')
+
+# get_target = lambda df: (df['duration'].values, df['event'].values)
+# y_train = get_target(df_train)
+# y_val = get_target(df_val)
+# durations_test, events_test = get_target(df_test)
+# val = x_val, y_val
+
 
 cox_column_list = [ 'PFS', 'Event',
-        'PET Global','PET BMI', 'SUVmaxBM',# 'SUVmaxFL',# 'PET EMD', 'PET PMD',   'PET FL',
-        # 'MRI Global', 'MRI BMI', 'ADCMeanBMI', 'MRI FL', 'ADCMeanFL', 'MRI EMD', 'MRI PMD',
-        # 'PET Number FLs', 'PET Number PMD', 'MRI Number FLs', 'MRI Number PMD',  
+                   # 'Pic','Plasmocytose',
+        #'PET BMI', 'SUVmaxBM',# 'SUVmaxFL',# 'PET EMD', 'PET PMD',   'PET FL',
+        'MRI BMI', #'ADCMeanBMI', #'MRI FL', 'ADCMeanFL', 'MRI EMD', 'MRI PMD',
+        'PEI', 'MITR' 
        ]  
 df["PFS"] = df[["PFS"]].astype(float)
+df['PEI'] = df['PEI'].replace(['', ' '], None)
+df["PEI"] = df[["PEI"]].astype(float)
 df["Event"] = df["P ou R"].notna().astype(int)
 
-df_pre = df[df["Stade"]=="Pre-CAR-T-CELLS"]
-df_post = df[df["Stade"]=="Post-CAR-T-CELLS"]
-
-df_train = df_pre[cox_column_list] # metabric.read_df()
+df_train = df[cox_column_list] # metabric.read_df()
 df_test = df_train.sample(frac=0.1)
 df_train = df_train.drop(df_test.index)
 df_val = df_train.sample(frac=0.2)
 df_train = df_train.drop(df_val.index)
 
-df_train_ori = metabric.read_df()
-print(type(df_train))
-print(type(df_train_ori))
-
 print(df_train.dtypes)
-print(df_train_ori.dtypes)
 
 ########### preprocess the characteristics
 
-cols_standardize = ['SUVmaxBM', # 'SUVmaxFL', # 'ADCMeanBMI', 'ADCMeanFL'
-                    ]
-cols_leave = ['PET Global', 'PET BMI',# 'PET FL',#  'PET EMD', 'PET PMD',
-              #'MRI Global', 'MRI BMI', 'MRI FL', 'MRI EMD', 'MRI PMD'
-              ]
+cols_standardize = [#'Pic','Plasmocytose',
+                    'PEI', 'MITR' ]
+cols_leave = ['MRI BMI']
 
 standardize = [([col], StandardScaler()) for col in cols_standardize]
 leave = [(col, None) for col in cols_leave]
@@ -111,9 +101,9 @@ print("x train shape:",x_train.shape)
 print("x val shape:",x_val.shape)
 print("x test shape:",x_test.shape)
 
-################## create neuronal networks
+################## create neural networks
 in_features = x_train.shape[1]
-num_nodes = [32, 32]
+num_nodes = [8,8] #32, 32
 out_features = 1
 batch_norm = True
 dropout = 0.1
@@ -122,28 +112,31 @@ output_bias = False
 net = tt.practical.MLPVanilla(in_features, num_nodes, out_features, batch_norm,
                               dropout, output_bias=output_bias)
 
-print(net.parameters())
+for name, param in net.named_parameters():
+    print(f"{name}: {param.shape}")
+# print(net.named_parameters())
 # fit the model
 model = CoxPH(net, tt.optim.Adam)
 
-batch_size = 8 #256
+batch_size = 32 #256
 lrfinder = model.lr_finder(x_train, y_train, batch_size, tolerance=10)
 _ = lrfinder.plot()
-# plt.show()
+plt.show()
 
-print(lrfinder.get_best_lr())
+print("### Best lr: ",lrfinder.get_best_lr())
+# exit()
 
-model.optimizer.set_lr(0.01)
+model.optimizer.set_lr(0.1)
 
 # Training the model
-epochs = 128 #512
+epochs = 32 #512
 callbacks = [tt.callbacks.EarlyStopping()]
 verbose = True
 
 log = model.fit(x_train, y_train, batch_size, epochs, callbacks, verbose,
                 val_data=val, val_batch_size=batch_size)
 log.plot()
-# plt.show()
+plt.show()
 
 print("model.partial_log_likelihood(*val).mean()", model.partial_log_likelihood(*val).mean())
 
@@ -154,7 +147,7 @@ surv = model.predict_surv_df(x_test)
 surv.iloc[:, :5].plot()
 plt.ylabel('S(t | x)')
 plt.xlabel('Time')
-# plt.show()
+plt.show()
 
 
 ############evaluation
