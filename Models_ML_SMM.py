@@ -34,7 +34,7 @@ print(df.shape)
 # print(df["ADCMeanBMI"].mean(),df["ADCMeanBMI"].std())
 
 variate_list = [
-        'Pic', 'Plasmocytose', 'Ratio k/l',
+        'Pic', 'Plasmocytose', #'Ratio k/l',
         'PET BMI', 'SUVmaxBM', #'PET FL',
         'MRI BMI', 'ADCMeanBMI',# 'MRI FL',
         'PEI', 'TPEI', 'MITR',
@@ -95,7 +95,7 @@ pipe = Pipeline(
     [
         ("encode", OneHotEncoder()),
         ("select", SelectKBest(fit_and_score_features, k=3)),
-        ("model", FastSurvivalSVM(max_iter=1000, tol=1e-5, random_state=0)), 
+        ("model", RandomSurvivalForest(n_estimators=200, min_samples_split=10, min_samples_leaf=15, n_jobs=-1, random_state=20)), 
     ]
 )
 # CoxPHSurvivalAnalysis()), 
@@ -117,36 +117,38 @@ print("results table: \n")
 print(results.loc[:, ~results.columns.str.endswith("_time")])
 results.to_csv(os.path.join(proj_path,"Results_of_3folds.csv"))
 # /home/kevin/Documents/SUN Huajun/Projects/1-DPAnalysis-main/
-print()
 
 pipe.set_params(**gcv.best_params_)
 pipe.fit(X_train,y_train) 
 
-# for cox PH model
+
 encoder, transformer, final_estimator = (s[1] for s in pipe.steps)
+print(encoder.encoded_columns_[transformer.get_support()]) # show which parameters are being selected
+
+# only for cox PH model
 # print(pd.Series(final_estimator.coef_, index=encoder.encoded_columns_[transformer.get_support()])) # RFS doesn't have coef for hazard ratio
 # print("HR: \n",pd.Series(np.exp(final_estimator.coef_), index=encoder.encoded_columns_[transformer.get_support()])) # RFS doesn't have coef for hazard ratio
 
 
+# only for parameters are all the columns
+# print(pd.Series(final_estimator.predict(X_test)))
 
-print(pd.Series(final_estimator.predict(X_test)))
+# ################################### plot the survival function
+# surv = final_estimator.predict_survival_function(X_test, return_array=True)
+# for i, s in enumerate(surv):
+#     plt.step(final_estimator.unique_times_, s, where="post", label=str(i))
+# plt.ylabel("Survival probability")
+# plt.xlabel("Time in days")
+# plt.legend()
+# plt.grid(True)
+# plt.show()
 
-################################### plot the survival function
-surv = final_estimator.predict_survival_function(X_test, return_array=True)
-for i, s in enumerate(surv):
-    plt.step(final_estimator.unique_times_, s, where="post", label=str(i))
-plt.ylabel("Survival probability")
-plt.xlabel("Time in days")
-plt.legend()
-plt.grid(True)
-plt.show()
-
-########################### plot the cumulative hazard function
-surv = final_estimator.predict_cumulative_hazard_function(X_test, return_array=True)
-for i, s in enumerate(surv):
-    plt.step(final_estimator.unique_times_, s, where="post", label=str(i))
-plt.ylabel("Cumulative hazard")
-plt.xlabel("Time in days")
-plt.legend()
-plt.grid(True)
-plt.show()
+# ########################### plot the cumulative hazard function
+# surv = final_estimator.predict_cumulative_hazard_function(X_test, return_array=True)
+# for i, s in enumerate(surv):
+#     plt.step(final_estimator.unique_times_, s, where="post", label=str(i))
+# plt.ylabel("Cumulative hazard")
+# plt.xlabel("Time in days")
+# plt.legend()
+# plt.grid(True)
+# plt.show()
