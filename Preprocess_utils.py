@@ -72,7 +72,6 @@ column_list = ["Global","FL", "BMI", "EMD", "PMD"] #
 
 
 df = pd.read_csv(os.path.join(file_path,file_name))
-mri_idx = df.columns.get_loc('MRI global')
 
 df.rename(columns=rename_dict, inplace=True)
 # clean the Nan data: 
@@ -80,10 +79,10 @@ df = df[df["PET Global"].notna()]
 
 
 # print(df["Ig"].value_counts(normalize=True))
-print("SUVmaxBM: ",df["SUVmaxBM"].mean(),df["SUVmaxBM"].std())
+# print("SUVmaxBM: ",df["SUVmaxBM"].mean(),df["SUVmaxBM"].std())
 # print(df["SUVmaxBM"])
 # print(df.head())
-print(df["ADCMeanBMI"].mean(),df["ADCMeanBMI"].std())
+# print(df["ADCMeanBMI"].mean(),df["ADCMeanBMI"].std())
 # print(df_test.head())
 
 ##########################################################################
@@ -96,7 +95,7 @@ print(df["ADCMeanBMI"].mean(),df["ADCMeanBMI"].std())
 df_pre = df[df["Stade"]=="Pre-CAR-T-CELLS"]
 df_post = df[df["Stade"]=="Post-CAR-T-CELLS"]
 
-print(df_post["Reponse"].value_counts())
+# print(df_post["Reponse"].value_counts())
 df_post_CR = df_post[df_post["Reponse"]=="CR"]
 df_post_0 = df_post[df_post["Reponse"]=="0"]
 df_post_nonCR = df_post[~df_post["Reponse"].isin(["0", "CR"])]
@@ -189,15 +188,18 @@ def fishers_exact(df,var_list):
 #####################################################################################
 """To draw a Kaplan-Meier Plot based on the current data"""
 def Kaplan_Meier_plot(df_func):
+    """
+    Input a dataframe, and it based on "P ou R" and "PFS" to generate Event and produce plot
+    """
     import matplotlib.pyplot as plt
     from sksurv.nonparametric import kaplan_meier_estimator
 
     
     df_func = df_func[["P ou R", "PFS"]]
     df_func["Event"] = df_func["P ou R"].notna()
-    print(df_func.head())
+    # print(df_func.head())
     x, y, conf_int = kaplan_meier_estimator(df_func["Event"], df_func["PFS"], conf_type="log-log")
-    print(x,y)
+    # print(x,y)
 
     # Add censored points to the plot
     points_x = []
@@ -495,7 +497,7 @@ common_keys = pd.merge(df_pre[['NOM', 'Prenom']], df_post[['NOM', 'Prenom']], on
 
 # Count the number of common keys
 num_common_keys = len(common_keys)
-print(f"Number of common key pairs: {num_common_keys}")
+# print(f"Number of common key pairs: {num_common_keys}")
 
 # Merge the DataFrames on common keys, including all columns
 merged_df = pd.merge(df_pre, df_post, on=['NOM', 'Prenom'], suffixes=(' pre', ' post'))
@@ -529,7 +531,7 @@ for element in compa_elements:
 
 patient_df = merged_df[merged_df["PET Global comp"]== 3]
 # print(patient_df.columns[10:20])
-print(patient_df[[ "PET BMI post", "PET FL post", "PET EMD post", "PET PMD post"]])
+# print(patient_df[[ "PET BMI post", "PET FL post", "PET EMD post", "PET PMD post"]])
 
 patient_df = merged_df[merged_df["MRI Global comp"]== 3]
-print(patient_df[[ "MRI BMI post", "MRI FL post", "MRI EMD post", "MRI PMD post"]])
+# print(patient_df[[ "MRI BMI post", "MRI FL post", "MRI EMD post", "MRI PMD post"]])
